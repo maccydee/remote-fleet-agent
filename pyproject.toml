@@ -3,7 +3,10 @@ name = "remote-fleet-agent"
 version = "0.1.0"
 requires-python = ">=3.11"
 dependencies = [
-    "mcp>=1.0.0",
+    # server.py is built on mcp.server.mcpserver.MCPServer, which only
+    # exists in the 2.x line (mcp.server.fastmcp.FastMCP was renamed/moved
+    # there) - see docs/plans/EXECUTION-LOG.md A-006.
+    "mcp>=2.0.0",
     "asyncssh>=2.14.0",
 ]
 
