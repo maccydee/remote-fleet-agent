@@ -45,3 +45,24 @@ client's keypair to use at runtime, so this assumes **one server process
 per client engagement**, matching the "one keypair per client" design
 decision. Multi-client-in-one-process was never a requirement, so this
 wasn't engineered for.
+
+## A-007 | Task 21 | assumption | RESOLVED
+Pester 6's `Mock` requires the target command to already resolve via
+`Get-Command` before it can attach to it. `Unregister-ScheduledTask`,
+`Get-NetFirewallRule`, `Remove-NetFirewallRule`, and
+`Disable-WindowsOptionalFeature` ship in Windows-only modules
+(ScheduledTasks, NetSecurity, DISM) that don't exist on this (macOS) dev
+machine, so the plan's test file as written couldn't run here at all - not
+a Pester 5-vs-6 syntax gap, a missing-module gap.
+**Resolved:** `scripts/uninstall.ps1` opens with four
+`if (-not (Get-Command <name> -ErrorAction SilentlyContinue)) { function <name> {...} }`
+guards that define no-op stubs for exactly those four cmdlets, and only
+when the real one isn't already present. On real Windows, where all four
+resolve from their native modules, the guard body never runs and the
+stubs are never defined - genuine cmdlets are called as-is. Verified by
+reading the file directly (not just the subagent's report) and confirming
+the guard condition and that no caller-visible behavior changed. The same
+pattern will be needed in `scripts/install.ps1`'s own Pester run if it
+mocks any of the same Windows-only cmdlets (`Enable-WindowsOptionalFeature`,
+`New-NetFirewallRule`, `Register-ScheduledTask`, etc.) - check its report
+for whether it hit the same issue.
