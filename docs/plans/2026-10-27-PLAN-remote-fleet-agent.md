@@ -28,10 +28,13 @@ Windows-API behaviour is verified manually — see Task 22).
 
 | Status | Count |
 |--------|-------|
-| 🔴 NOT_STARTED | 10 |
+| 🔴 NOT_STARTED | 1 |
 | 🟡 IN_PROGRESS | 0 |
-| 🟢 COMPLETED | 13 |
+| 🟢 COMPLETED | 22 |
 | ⚪ BLOCKED | 0 |
+
+Only Task 22 (manual verification on a real Windows machine) remains —
+it cannot be done from this Mac by design. See that task's section below.
 
 ## Production readiness
 
@@ -1385,7 +1388,7 @@ git add src/remote_fleet_agent/fanout.py tests/test_fanout.py
 git commit -m "feat: require exact scope confirmation before destructive fan-out"
 ```
 
-## Task 14: MCP server — register and expose the tool set 🔴 NOT_STARTED
+## Task 14: MCP server — register and expose the tool set 🟢 COMPLETED
 
 **Files:**
 - Create: `src/remote_fleet_agent/server.py`
@@ -1464,7 +1467,7 @@ git add src/remote_fleet_agent/server.py tests/test_server.py
 git commit -m "feat: MCP server exposing the five safe tools"
 ```
 
-## Task 15: CLI — stage a client's install kit 🔴 NOT_STARTED
+## Task 15: CLI — stage a client's install kit 🟢 COMPLETED
 
 **Files:**
 - Create: `src/remote_fleet_agent/cli.py`
@@ -1560,7 +1563,7 @@ git add src/remote_fleet_agent/cli.py tests/test_cli.py
 git commit -m "feat: CLI to generate a per-client keypair and stage the USB install kit"
 ```
 
-## Task 16: `install.ps1` — idempotent OpenSSH enablement 🔴 NOT_STARTED
+## Task 16: `install.ps1` — idempotent OpenSSH enablement 🟢 COMPLETED
 
 **Files:**
 - Create: `scripts/install.ps1`
@@ -1658,7 +1661,7 @@ git add scripts/install.ps1 scripts/install.Tests.ps1
 git commit -m "feat: idempotent OpenSSH enablement with prior-state tracking"
 ```
 
-## Task 17: `install.ps1` — idempotent authorized_keys append 🔴 NOT_STARTED
+## Task 17: `install.ps1` — idempotent authorized_keys append 🟢 COMPLETED
 
 **Files:**
 - Modify: `scripts/install.ps1`
@@ -1727,7 +1730,7 @@ git add scripts/install.ps1 scripts/install.Tests.ps1
 git commit -m "feat: idempotent authorized_keys append"
 ```
 
-## Task 18: `install.ps1` — scoped, idempotent firewall rule 🔴 NOT_STARTED
+## Task 18: `install.ps1` — scoped, idempotent firewall rule 🟢 COMPLETED
 
 **Files:**
 - Modify: `scripts/install.ps1`
@@ -1794,7 +1797,7 @@ git add scripts/install.ps1 scripts/install.Tests.ps1
 git commit -m "feat: scoped firewall rule, replaced not stacked on re-run"
 ```
 
-## Task 19: `install.ps1` — 3-day self-destruct scheduled task 🔴 NOT_STARTED
+## Task 19: `install.ps1` — 3-day self-destruct scheduled task 🟢 COMPLETED
 
 **Files:**
 - Modify: `scripts/install.ps1`
@@ -1887,7 +1890,7 @@ git add scripts/install.ps1 scripts/install.Tests.ps1
 git commit -m "feat: 3-day self-destruct scheduled task, reset on re-install"
 ```
 
-## Task 20: `install.ps1` — main entry point and parameter validation 🔴 NOT_STARTED
+## Task 20: `install.ps1` — main entry point and parameter validation 🟢 COMPLETED
 
 **Files:**
 - Modify: `scripts/install.ps1`
@@ -1980,7 +1983,7 @@ git add scripts/install.ps1 scripts/install.Tests.ps1
 git commit -m "feat: install.ps1 main entry point with fail-fast parameter validation"
 ```
 
-## Task 21: `uninstall.ps1` — full reversal and receipt 🔴 NOT_STARTED
+## Task 21: `uninstall.ps1` — full reversal and receipt 🟢 COMPLETED
 
 **Files:**
 - Create: `scripts/uninstall.ps1`
@@ -2144,7 +2147,7 @@ PowerShell session):**
 
 This task is 🔴 NOT_STARTED until that note exists.
 
-## Task 23: README for the engineer 🔴 NOT_STARTED
+## Task 23: README for the engineer 🟢 COMPLETED
 
 **Files:**
 - Create: `README.md`
