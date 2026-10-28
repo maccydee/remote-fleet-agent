@@ -87,3 +87,22 @@ survives removal, and an `Invoke-Install` test proving the key gets
 recorded - both confirmed RED against the original code before the fix,
 then GREEN after. 18 Pester tests total now (was 15), 40 Python tests
 unaffected.
+
+## A-009 | Task 20 | skeptic finding | FIXED
+Same post-build skeptic pass caught a second, more serious bug:
+`Invoke-Install` pointed the self-destruct scheduled task at
+`(Join-Path $PSScriptRoot "uninstall.ps1")`. `$PSScriptRoot` is wherever
+`install.ps1` was launched from - per the README's own workflow, that's
+the USB stick, run directly from its mount point. The scheduled task
+fires 3 days later, almost certainly after the engineer has moved on and
+the stick is unplugged - `powershell.exe -File "<gone-drive>:\uninstall.ps1"`
+would silently fail to find anything to run. The entire self-destruct
+dead-man's-switch, the feature specifically added in response to the
+"forgotten uninstall leaves a permanent backdoor" skeptic finding during
+design, would not have actually worked.
+**Fixed:** `Invoke-Install` now copies `uninstall.ps1` into the same
+local `C:\ProgramData\remote-fleet-agent` state directory it already
+creates (`Copy-Item` from `$PSScriptRoot` to that local path), and points
+`Register-SelfDestructTask` at the local copy, never `$PSScriptRoot`.
+Added a test asserting the exact local path is what's passed to
+`Register-SelfDestructTask`. 19 Pester tests total now.

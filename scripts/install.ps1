@@ -105,7 +105,15 @@ function Invoke-Install {
     $state | ConvertTo-Json | Set-Content -Path $statePath
 
     Add-ScopedFirewallRule -AllowedIP $AllowedIP
-    Register-SelfDestructTask -UninstallScriptPath (Join-Path $PSScriptRoot "uninstall.ps1") `
+
+    # (WHY: the self-destruct task runs days later, almost certainly after
+    # the USB stick install.ps1 was launched from has been unplugged - it
+    # must reference a LOCAL copy of uninstall.ps1, never $PSScriptRoot,
+    # or the scheduled task silently finds nothing to run and the whole
+    # dead-man's-switch does nothing.)
+    $localUninstallPath = Join-Path $stateDir "uninstall.ps1"
+    Copy-Item -Path (Join-Path $PSScriptRoot "uninstall.ps1") -Destination $localUninstallPath -Force
+    Register-SelfDestructTask -UninstallScriptPath $localUninstallPath `
         -DaysUntilExpiry $DaysUntilExpiry
 
     Write-Output "Install complete. Self-destructs in $DaysUntilExpiry day(s) unless re-run."

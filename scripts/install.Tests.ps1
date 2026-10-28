@@ -166,6 +166,7 @@ Describe "Invoke-Install (main)" {
         } -Verifiable
         Mock Add-EngineerKey { } -Verifiable
         Mock Add-ScopedFirewallRule { } -Verifiable
+        Mock Copy-Item { }
         Mock Register-SelfDestructTask { } -Verifiable
         $keyFile = Join-Path $TestDrive "key.pub"
         Set-Content $keyFile "ssh-ed25519 AAAA..."
@@ -189,6 +190,7 @@ Describe "Invoke-Install (main)" {
         Mock Get-Service { [PSCustomObject]@{ Status = "Running" } } -ParameterFilter { $Name -eq "sshd" }
         Mock Add-EngineerKey { }
         Mock Add-ScopedFirewallRule { }
+        Mock Copy-Item { }
         Mock Register-SelfDestructTask { }
         $keyFile = Join-Path $TestDrive "key3.pub"
         Set-Content $keyFile "ssh-ed25519 CCCC... engineer@laptop"
@@ -197,6 +199,33 @@ Describe "Invoke-Install (main)" {
 
         $state = Get-Content $realStatePath | ConvertFrom-Json
         $state.ssh_key_added | Should -Be "ssh-ed25519 CCCC... engineer@laptop"
+    }
+
+    It "copies uninstall.ps1 into the local state dir and points the self-destruct task there, not at PSScriptRoot" {
+        # (WHY: PSScriptRoot is wherever install.ps1 was launched from - the
+        # USB stick, per the README workflow. The self-destruct task fires
+        # days later, almost certainly after that stick is unplugged, so it
+        # must be pointed at a local copy instead.)
+        $realStatePath = Join-Path $TestDrive "state5.json"
+        Mock New-Item { }
+        Mock Join-Path {
+            param($Path, $ChildPath)
+            if ($ChildPath -eq "state.json") { return $realStatePath }
+            "$Path\$ChildPath"
+        }
+        Mock Copy-Item { } -Verifiable
+        Mock Get-Service { [PSCustomObject]@{ Status = "Running" } } -ParameterFilter { $Name -eq "sshd" }
+        Mock Add-EngineerKey { }
+        Mock Add-ScopedFirewallRule { }
+        Mock Register-SelfDestructTask { } -Verifiable -ParameterFilter {
+            $UninstallScriptPath -eq "C:\ProgramData\remote-fleet-agent\uninstall.ps1"
+        }
+        $keyFile = Join-Path $TestDrive "key5.pub"
+        Set-Content $keyFile "ssh-ed25519 DDDD... engineer@laptop"
+
+        Invoke-Install -AllowedIP "192.168.1.53" -PublicKeyPath $keyFile
+
+        Should -InvokeVerifiable
     }
 
     It "rejects a malformed IP before making any changes" {
