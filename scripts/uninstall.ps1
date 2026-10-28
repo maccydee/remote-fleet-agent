@@ -32,10 +32,19 @@ if (-not (Get-Command Disable-WindowsOptionalFeature -ErrorAction SilentlyContin
 }
 
 function Remove-EngineerKey {
-    param([string]$AuthorizedKeysPath = "$env:ProgramData\ssh\administrators_authorized_keys")
-    # Removal targets the key this tool added; in v1 that's the only key
-    # in this file, so clearing it is safe and simple.
-    if (Test-Path $AuthorizedKeysPath) { Clear-Content $AuthorizedKeysPath }
+    param(
+        [string]$AuthorizedKeysPath = "$env:ProgramData\ssh\administrators_authorized_keys",
+        [string]$KeyContent
+    )
+    # (WHY: remove only the exact line this install added, never the whole
+    # file - administrators_authorized_keys is shared across every local
+    # admin account, and may already have held other keys before this tool
+    # ever ran, e.g. when ssh_was_already_enabled was true at install time.
+    # A blanket Clear-Content here would destroy those too.)
+    if (-not $KeyContent) { return }
+    if (-not (Test-Path $AuthorizedKeysPath)) { return }
+    $remaining = @(Get-Content $AuthorizedKeysPath | Where-Object { $_ -ne $KeyContent })
+    Set-Content -Path $AuthorizedKeysPath -Value $remaining
 }
 
 function Remove-ScopedFirewallRule {
@@ -51,7 +60,7 @@ function Invoke-Uninstall {
     $state = Get-Content $StatePath | ConvertFrom-Json
     $removed = @()
 
-    Remove-EngineerKey
+    Remove-EngineerKey -KeyContent $state.ssh_key_added
     $removed += "ssh_key"
 
     Remove-ScopedFirewallRule

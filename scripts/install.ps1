@@ -88,10 +88,22 @@ function Invoke-Install {
 
     $stateDir = "C:\ProgramData\remote-fleet-agent"
     New-Item -ItemType Directory -Force -Path $stateDir | Out-Null
+    $statePath = Join-Path $stateDir "state.json"
 
-    Enable-OpenSSHServer -StatePath (Join-Path $stateDir "state.json")
+    Enable-OpenSSHServer -StatePath $statePath
+
+    $publicKeyContent = (Get-Content $PublicKeyPath -Raw).Trim()
     Add-EngineerKey -PublicKeyPath $PublicKeyPath `
-        -AuthorizedKeysPath "$env:ProgramData\ssh\administrators_authorized_keys"
+        -AuthorizedKeysPath "$env:ProgramData\ssh\administrators_authorized_keys" `
+        -PublicKeyContent $publicKeyContent
+
+    # (WHY: record exactly which key line was added so uninstall can remove
+    # only that line later, never the whole shared authorized_keys file -
+    # see Remove-EngineerKey in uninstall.ps1.)
+    $state = Get-Content $statePath | ConvertFrom-Json
+    $state | Add-Member -NotePropertyName ssh_key_added -NotePropertyValue $publicKeyContent -Force
+    $state | ConvertTo-Json | Set-Content -Path $statePath
+
     Add-ScopedFirewallRule -AllowedIP $AllowedIP
     Register-SelfDestructTask -UninstallScriptPath (Join-Path $PSScriptRoot "uninstall.ps1") `
         -DaysUntilExpiry $DaysUntilExpiry

@@ -144,13 +144,26 @@ Describe "Invoke-Install (main)" {
         # DEVIATION: mock New-Item and Join-Path too - the real install path
         # is the literal Windows path "C:\ProgramData\remote-fleet-agent",
         # and macOS pwsh has no C: PSDrive, so even Join-Path (not just
-        # New-Item) throws trying to resolve it. Neither mock's return value
-        # matters here since the function receiving it (Enable-OpenSSHServer)
-        # is itself mocked below - this is only about not erroring on an
-        # OS-specific path quirk unrelated to what this test checks.
+        # New-Item) throws trying to resolve it. The state.json branch of
+        # Join-Path is redirected to a real TestDrive path, because
+        # Invoke-Install now reads the state file back after Add-EngineerKey
+        # to record which key it added (see Remove-EngineerKey's precise-
+        # removal fix) - Enable-OpenSSHServer's mock writes a minimal real
+        # file there so that read has something to find. Other Join-Path
+        # calls fall back to a literal passthrough since nothing downstream
+        # reads them.
+        $realStatePath = Join-Path $TestDrive "state.json"
         Mock New-Item { }
-        Mock Join-Path { param($Path, $ChildPath) "$Path\$ChildPath" }
-        Mock Enable-OpenSSHServer { } -Verifiable
+        Mock Join-Path {
+            param($Path, $ChildPath)
+            if ($ChildPath -eq "state.json") { return $realStatePath }
+            "$Path\$ChildPath"
+        }
+        Mock Enable-OpenSSHServer {
+            param($StatePath)
+            @{ ssh_was_already_enabled = $true; installed_at = "2026-10-24T00:00:00Z" } |
+                ConvertTo-Json | Set-Content -Path $StatePath
+        } -Verifiable
         Mock Add-EngineerKey { } -Verifiable
         Mock Add-ScopedFirewallRule { } -Verifiable
         Mock Register-SelfDestructTask { } -Verifiable
@@ -160,6 +173,30 @@ Describe "Invoke-Install (main)" {
         Invoke-Install -AllowedIP "192.168.1.50" -PublicKeyPath $keyFile
 
         Should -InvokeVerifiable
+    }
+
+    It "records the engineer key content in state.json for safe removal later" {
+        $realStatePath = Join-Path $TestDrive "state4.json"
+        Mock New-Item { }
+        Mock Join-Path {
+            param($Path, $ChildPath)
+            if ($ChildPath -eq "state.json") { return $realStatePath }
+            "$Path\$ChildPath"
+        }
+        # Not mocked: Enable-OpenSSHServer runs for real, using the
+        # file-level Get-Service stub (forced to "Running" here) so it
+        # takes the already-enabled branch and just writes initial state.
+        Mock Get-Service { [PSCustomObject]@{ Status = "Running" } } -ParameterFilter { $Name -eq "sshd" }
+        Mock Add-EngineerKey { }
+        Mock Add-ScopedFirewallRule { }
+        Mock Register-SelfDestructTask { }
+        $keyFile = Join-Path $TestDrive "key3.pub"
+        Set-Content $keyFile "ssh-ed25519 CCCC... engineer@laptop"
+
+        Invoke-Install -AllowedIP "192.168.1.52" -PublicKeyPath $keyFile
+
+        $state = Get-Content $realStatePath | ConvertFrom-Json
+        $state.ssh_key_added | Should -Be "ssh-ed25519 CCCC... engineer@laptop"
     }
 
     It "rejects a malformed IP before making any changes" {

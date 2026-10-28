@@ -66,3 +66,24 @@ pattern will be needed in `scripts/install.ps1`'s own Pester run if it
 mocks any of the same Windows-only cmdlets (`Enable-WindowsOptionalFeature`,
 `New-NetFirewallRule`, `Register-ScheduledTask`, etc.) - check its report
 for whether it hit the same issue.
+
+## A-008 | Tasks 20-21 | skeptic finding | FIXED
+Post-build skeptic pass over the actual merged code (not just the design)
+caught a real bug: `uninstall.ps1`'s `Remove-EngineerKey` called
+`Clear-Content` on the whole `administrators_authorized_keys` file.
+That file is shared across every local administrator account, and the
+design itself anticipates SSH sometimes being enabled before this tool
+ever runs (`ssh_was_already_enabled: true`) - meaning other, unrelated
+keys could already be in that file, and uninstall would have destroyed
+them along with ours.
+**Fixed:** `install.ps1`'s `Invoke-Install` now records the exact public
+key line it added as `ssh_key_added` in `state.json` (read-modify-write
+after `Add-EngineerKey`). `uninstall.ps1`'s `Remove-EngineerKey` now takes
+`-KeyContent` and removes only the matching line via
+`Where-Object { $_ -ne $KeyContent }`, doing nothing if no key was
+recorded (e.g. a state file predating this fix). Added a real
+(non-mocked) `Remove-EngineerKey` test proving another admin's key
+survives removal, and an `Invoke-Install` test proving the key gets
+recorded - both confirmed RED against the original code before the fix,
+then GREEN after. 18 Pester tests total now (was 15), 40 Python tests
+unaffected.
