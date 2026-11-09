@@ -48,7 +48,7 @@ jobs:
       - run: python -m pip install -e ".[dev,browser]"
       - run: python -m playwright install --with-deps chromium
       - run: python -m pytest tests/browser -q --screenshot=only-on-failure --output=browser-results
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: failure()
         with:
           name: browser-debugging
