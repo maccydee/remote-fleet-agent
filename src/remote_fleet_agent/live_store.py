@@ -40,16 +40,23 @@ class Conflict(ValueError):
     pass
 
 
+class SessionExpired(Denied):
+    """An absent/expired HTTP session, distinct from a scope or role denial."""
+
+
 class LiveStore:
     def __init__(self, directory):
         self.folder = private_dir(Path(directory) / ".state")
         key = self.folder / "journal-key"
         if not key.exists():
             atomic_text(key, secrets.token_hex(32))
+        restrict_private(key)
         self.key = key.read_bytes()
         path = self.folder / "workspace.sqlite3"
         if path.is_symlink():
             raise ValueError("Workspace database must not be a symbolic link.")
+        if path.exists():
+            restrict_private(path)
         self.db = sqlite3.connect(path, check_same_thread=False)
         restrict_private(path)
         self.db.row_factory = sqlite3.Row

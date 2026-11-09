@@ -10,6 +10,7 @@ from pathlib import Path
 
 import asyncssh
 
+from remote_fleet_agent.host_platform import process_exists
 from remote_fleet_agent.live_store import Conflict, Denied
 from remote_fleet_agent.storage import digest, private_dir, stamp
 
@@ -27,20 +28,25 @@ def target_snapshot(service, actor: dict, client: str, names: list[str]) -> list
             )
             if not pins:
                 raise Denied("No pinned host identity for selected target")
-        snapshots.append(
-            {
-                "name": host.name,
-                "target": host.target,
-                "port": host.port,
-                "platform": host.platform,
-                "site": host.site,
-                "host_keys": pins,
-                "simulation": config.simulation,
-                "key_reference": digest(
-                    str(service.descriptor(client).get("key_path", "simulation"))
-                ),
-            }
-        )
+        snapshot = {
+            "name": host.name,
+            "target": host.target,
+            "port": host.port,
+            "platform": host.platform,
+            "site": host.site,
+            "host_keys": pins,
+            "simulation": config.simulation,
+            "key_reference": digest(
+                str(service.descriptor(client).get("key_path", "simulation"))
+            ),
+        }
+        if not config.simulation:
+            from remote_fleet_agent.device_identity import resolve_device
+
+            snapshot["device_id"] = resolve_device(
+                {**snapshot, "device_id": host.device_id}
+            )
+        snapshots.append(snapshot)
     return sorted(snapshots, key=lambda item: item["name"])
 
 
@@ -56,8 +62,11 @@ def require_administration(service, actor: dict, client: str, names: list[str]):
 
 
 def endpoint_key(target: dict) -> str:
-    # Pins bind aliases/accounts to the same server. Copied server keys may
-    # conservatively serialize unrelated hosts until enrollment is reconciled.
+    if not target.get("simulation"):
+        from remote_fleet_agent.device_identity import resolve_device
+
+        return resolve_device(target)
+    # Fictional devices stay in their workspace namespace and never enroll.
     identity = target["host_keys"] or [target["target"].split("@", 1)[1].casefold()]
     return digest({"identity": identity, "port": target["port"]})
 
@@ -75,7 +84,22 @@ def claim_path(target: dict, simulation_folder: Path | None = None) -> Path:
     )
     if not root.is_absolute():
         raise ValueError("Endpoint lock directory must be absolute")
-    return private_dir(root) / (endpoint_key(target) + ".lock")
+    root = private_dir(root)
+    if not target.get("simulation"):
+        # Old versions used a hash of the complete pin set. Never silently
+        # bypass their outstanding claims during upgrade, including unknown work.
+        identity = target["host_keys"] or [target["target"].split("@", 1)[1].casefold()]
+        legacy = root / (
+            digest({"identity": identity, "port": target["port"]}) + ".lock"
+        )
+        if legacy.exists():
+            return legacy  # Reconciliation of the original record can still find it.
+        for candidate in root.glob("*.lock"):
+            if not json.loads(candidate.read_text(encoding="utf-8")).get("device_id"):
+                raise Conflict(
+                    "Legacy device claims remain; stop old controllers and reconcile their work before upgrading"
+                )
+    return root / (endpoint_key(target) + ".lock")
 
 
 class EndpointClaim:
@@ -94,6 +118,9 @@ class EndpointClaim:
             json.dump(
                 {
                     "owner": owner,
+                    "device_id": self.path.stem
+                    if not target.get("simulation")
+                    else None,
                     "owner_pid": os.getpid(),
                     "active": True,
                     "created_at": stamp(),
@@ -131,29 +158,9 @@ def claim_is_running(path: Path) -> bool:
         return True  # Older or malformed claims need explicit administrator inspection.
     if pid == os.getpid():
         return True
-    if os.name == "nt":
-        import ctypes
-        from ctypes import wintypes
-
-        kernel = ctypes.WinDLL("kernel32", use_last_error=True)
-        kernel.OpenProcess.restype = wintypes.HANDLE
-        handle = kernel.OpenProcess(0x1000, False, pid)
-        if not handle:
-            return ctypes.get_last_error() != 87
-        try:
-            status = wintypes.DWORD()
-            return (
-                not kernel.GetExitCodeProcess(handle, ctypes.byref(status))
-                or status.value == 259
-            )
-        finally:
-            kernel.CloseHandle(handle)
     try:
-        os.kill(pid, 0)
-        return True
-    except ProcessLookupError:
-        return False
-    except PermissionError:
+        return process_exists(pid)
+    except OSError:
         return True
 
 
@@ -295,4 +302,5 @@ def legacy_target(config, host) -> dict:
         "port": host.port,
         "host_keys": pins,
         "simulation": config.simulation,
+        "device_id": host.device_id,
     }

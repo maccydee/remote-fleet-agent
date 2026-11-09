@@ -160,6 +160,8 @@ function Invoke-Install {
         [string]$LocalSourcePath
     )
 
+    throw 'The legacy installer is retired. Generate a new kit with remote-fleet-agent init-client and run Install-Assessment.ps1. Existing cleanup tasks are not removed by this message.'
+
     if ($AllowedIP -notmatch '^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$') {
         throw "AllowedIP '$AllowedIP' is not a valid IPv4 address"
     }

@@ -43,7 +43,7 @@ def test_force_restages_without_changing_existing_key(tmp_path, monkeypatch):
     original = key.read_bytes()
     init_client("acme", stage_dir=stage, force=True)
     assert key.read_bytes() == original
-    for name in ("Install-Assessment", "Remove-Assessment"):
+    for name in ("Install-Assessment", "Remove-Assessment", "Protect-Assessment"):
         assert (stage / (name + ".ps1")).read_bytes() == (
             stage / (name + ".txt")
         ).read_bytes()

@@ -8,6 +8,7 @@ import io
 import os
 import platform
 import re
+import stat
 import subprocess
 from functools import lru_cache
 from pathlib import Path
@@ -60,12 +61,138 @@ def _windows_process_exists(pid):
 
 def restrict_private(path, *, directory=False):
     path = Path(path)
-    if path.is_symlink():
-        raise ValueError("Private storage must not be a symbolic link.")
+    validate_private_location(path)
     if platform.system() == "Windows":
         _windows_restrict(path, directory)
     else:
         path.chmod(0o700 if directory else 0o600)
+
+
+def validate_private_location(path):
+    """Reject untrusted ownership and replaceable parents before touching storage."""
+    path = Path(path).absolute()
+    if path.is_symlink() or getattr(path, "is_junction", lambda: False)():
+        raise ValueError("Private storage must not be a symbolic link or junction.")
+    try:
+        if getattr(path.lstat(), "st_file_attributes", 0) & 0x400:
+            raise ValueError("Private storage must not be a Windows reparse point.")
+    except FileNotFoundError:
+        pass
+    if platform.system() == "Windows":
+        trusted = {_windows_sid(), "S-1-5-18", "S-1-5-32-544"}
+        # Windows system folders may be owned by TrustedInstaller.
+        system_owners = trusted | {
+            "S-1-5-80-956008885-3418522649-1831038044-1853292631-2271478464"
+        }
+        for item in dict.fromkeys((path, *path.parents, *path.resolve().parents)):
+            if not item.exists():
+                continue
+            owner, grants = _windows_security(item)
+            if owner not in (trusted if item == path else system_owners):
+                raise PermissionError(f"Private storage has an untrusted owner: {item}")
+            if item != path and any(
+                sid not in trusted and mask & 0x100D0040 for sid, mask in grants
+            ):
+                raise PermissionError(
+                    f"Private storage parent allows replacement: {item}"
+                )
+        return
+    uid = os.geteuid()
+    for item in dict.fromkeys((path, *path.parents, *path.resolve().parents)):
+        if not item.exists():
+            continue
+        info = item.stat()
+        if info.st_uid not in ({uid} if item == path else {uid, 0}):
+            raise PermissionError(f"Private storage has an untrusted owner: {item}")
+        # Sticky parents (e.g. /tmp) protect an owned child's directory entry.
+        if item != path and info.st_mode & 0o022 and not info.st_mode & stat.S_ISVTX:
+            raise PermissionError(f"Private storage parent allows replacement: {item}")
+
+
+def _windows_security(path):
+    """Read owner and effective inheritable write grants without invoking a shell."""
+    from ctypes import wintypes
+
+    class ACL_SIZE_INFORMATION(ctypes.Structure):
+        _fields_ = [
+            ("AceCount", wintypes.DWORD),
+            ("AclBytesInUse", wintypes.DWORD),
+            ("AclBytesFree", wintypes.DWORD),
+        ]
+
+    advapi = ctypes.WinDLL("advapi32", use_last_error=True)
+    kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+    pointer = ctypes.c_void_p
+    advapi.GetNamedSecurityInfoW.argtypes = [
+        wintypes.LPWSTR,
+        wintypes.DWORD,
+        wintypes.DWORD,
+        ctypes.POINTER(pointer),
+        pointer,
+        ctypes.POINTER(pointer),
+        pointer,
+        ctypes.POINTER(pointer),
+    ]
+    advapi.GetNamedSecurityInfoW.restype = wintypes.DWORD
+    advapi.ConvertSidToStringSidW.argtypes = [pointer, ctypes.POINTER(wintypes.LPWSTR)]
+    advapi.ConvertSidToStringSidW.restype = wintypes.BOOL
+    advapi.GetAclInformation.argtypes = [
+        pointer,
+        pointer,
+        wintypes.DWORD,
+        wintypes.DWORD,
+    ]
+    advapi.GetAclInformation.restype = wintypes.BOOL
+    advapi.GetAce.argtypes = [pointer, wintypes.DWORD, ctypes.POINTER(pointer)]
+    advapi.GetAce.restype = wintypes.BOOL
+    kernel.LocalFree.argtypes = [pointer]
+    kernel.LocalFree.restype = pointer
+
+    def sid_text(sid):
+        text = wintypes.LPWSTR()
+        if not advapi.ConvertSidToStringSidW(sid, ctypes.byref(text)):
+            raise ctypes.WinError(ctypes.get_last_error())
+        try:
+            return text.value
+        finally:
+            kernel.LocalFree(ctypes.cast(text, pointer))
+
+    owner, acl, descriptor = pointer(), pointer(), pointer()
+    error = advapi.GetNamedSecurityInfoW(
+        str(path),
+        1,
+        5,
+        ctypes.byref(owner),
+        None,
+        ctypes.byref(acl),
+        None,
+        ctypes.byref(descriptor),
+    )
+    if error:
+        raise ctypes.WinError(error)
+    try:
+        if not acl.value:
+            return sid_text(owner), [("Everyone", 0x10000000)]
+        size = ACL_SIZE_INFORMATION()
+        if not advapi.GetAclInformation(
+            acl, ctypes.byref(size), ctypes.sizeof(size), 2
+        ):
+            raise ctypes.WinError(ctypes.get_last_error())
+        grants = []
+        for index in range(size.AceCount):
+            ace = pointer()
+            if not advapi.GetAce(acl, index, ctypes.byref(ace)):
+                raise ctypes.WinError(ctypes.get_last_error())
+            kind, flags = (ctypes.c_ubyte * 2).from_address(ace.value)
+            if flags & 8 or kind == 1:  # Inherit-only and deny entries grant no access.
+                continue
+            if kind != 0:
+                raise PermissionError(f"Unsupported storage ACL entry: {path}")
+            mask = wintypes.DWORD.from_address(ace.value + 4).value
+            grants.append((sid_text(ace.value + 8), mask))
+        return sid_text(owner), grants
+    finally:
+        kernel.LocalFree(descriptor)
 
 
 def _windows_restrict(path, directory):

@@ -5,6 +5,7 @@ from __future__ import annotations
 import ipaddress
 import json
 import re
+import uuid
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -20,6 +21,7 @@ class FleetHost:
     port: int = 22
     scenario: str = "healthy"
     site: str = "main"
+    device_id: str = ""
 
 
 @dataclass(frozen=True)
@@ -111,8 +113,27 @@ class FleetConfig:
                 not isinstance(g, str) or not _NAME.fullmatch(g) for g in groups
             ):
                 raise ValueError("groups must be a list of valid names")
+            device_id = item.get("device_id", "")
+            if device_id:
+                try:
+                    device_id = uuid.UUID(device_id).hex
+                except (ValueError, TypeError, AttributeError):
+                    raise ValueError(
+                        "device_id must be a valid enrolled UUID"
+                    ) from None
+            elif not isinstance(device_id, str):
+                raise ValueError("device_id must be a valid enrolled UUID")
             hosts.append(
-                FleetHost(name, target, tuple(groups), platform, port, scenario, site)
+                FleetHost(
+                    name,
+                    target,
+                    tuple(groups),
+                    platform,
+                    port,
+                    scenario,
+                    site,
+                    device_id,
+                )
             )
         concurrency = raw.get("concurrency", 4)
         timeout = raw.get("query_timeout_seconds", 30)

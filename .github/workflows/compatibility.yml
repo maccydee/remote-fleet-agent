@@ -25,6 +25,14 @@ jobs:
         run: python -m ruff check src tests/test_integration_compatibility.py
       - name: Tests including native process, private storage and stdio MCP
         run: python -m pytest -q -p no:cacheprovider --ignore=tests/browser
+      - name: Windows cleanup ownership and permission guards
+        if: runner.os == 'Windows' && matrix.python == '3.13'
+        shell: pwsh
+        run: |
+          Install-Module Pester -RequiredVersion 6.2.0 -Scope CurrentUser -Force
+          Import-Module Pester -RequiredVersion 6.2.0
+          $result = Invoke-Pester -Path tests/assessment.Tests.ps1,scripts/install.Tests.ps1,scripts/uninstall.Tests.ps1 -PassThru -Output Detailed
+          if ($result.FailedCount -or $result.FailedContainersCount) { exit 1 }
       - name: Build wheel and source distribution
         run: python -m build
 

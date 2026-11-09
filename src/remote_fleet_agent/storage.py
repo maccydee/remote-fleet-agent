@@ -11,7 +11,7 @@ from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
 
-from remote_fleet_agent.host_platform import restrict_private
+from remote_fleet_agent.host_platform import restrict_private, validate_private_location
 
 
 def stamp():
@@ -32,10 +32,9 @@ def private_dir(path):
     path = Path(path)
     if path.is_symlink():
         raise ValueError("storage directory must not be a symlink")
-    existed = path.exists()
+    validate_private_location(path)
     path.mkdir(parents=True, exist_ok=True, mode=0o700)
-    if not existed:
-        restrict_private(path, directory=True)
+    restrict_private(path, directory=True)
     return path
 
 

@@ -1,6 +1,8 @@
 [CmdletBinding()]
 param([string]$AllowedIP, [string]$Engagement, [string]$LocalSourcePath, [ValidateRange(0.1,100)][double]$MinimumFreeGB=2, [ValidateRange(1,14)][int]$ExpiryDays=3, [switch]$DotSource)
 
+. (Join-Path $PSScriptRoot 'Protect-Assessment.ps1')
+
 function Test-PortIncludesSSH {
     param([string[]]$Ports)
     foreach ($port in $Ports) {
@@ -195,7 +197,7 @@ function Invoke-AssessmentInstall {
     $statePath=Join-Path $stateDir 'state.json'
     $global:FleetNeedsRestart=$false
     $global:FleetStage='preflight'
-    if ((Test-Path -LiteralPath $stateDir) -and ((Get-Item -LiteralPath $stateDir -Force).Attributes -band [IO.FileAttributes]::ReparsePoint)) { throw 'State directory must not be a reparse point.' }
+    Assert-FleetStorageTree -Path $stateDir
     $previous=$null
     if (Test-Path -LiteralPath $statePath) {
         $previous=Get-Content -LiteralPath $statePath -Raw | ConvertFrom-Json
@@ -267,12 +269,15 @@ function Invoke-AssessmentInstall {
         $baseline.engineerIP=$EngineerIP
         $baseline.expiresAtUtc=(Get-Date).AddDays($ExpiryDays).ToUniversalTime().ToString('o')
     }
-    $null=New-Item -ItemType Directory -Force -Path $stateDir
-    & icacls.exe $stateDir /inheritance:r /grant:r '*S-1-5-18:(OI)(CI)F' '*S-1-5-32-544:(OI)(CI)F' | Out-Null
-    if ($LASTEXITCODE -ne 0) { throw 'Could not protect the local cleanup directory. Nothing installed.' }
+    New-FleetStorageDirectory -Path $stateDir
     Write-FleetState -State $baseline -Path $statePath
+    Set-FleetStorageAcl -Path $statePath
     $cleanup=Join-Path $stateDir 'Remove-Assessment.ps1'
+    Copy-Item -LiteralPath (Join-Path $KitDirectory 'Protect-Assessment.ps1') -Destination (Join-Path $stateDir 'Protect-Assessment.ps1') -Force
     Copy-Item -LiteralPath (Join-Path $KitDirectory 'Remove-Assessment.ps1') -Destination $cleanup
+    Set-FleetStorageAcl -Path (Join-Path $stateDir 'Protect-Assessment.ps1')
+    Set-FleetStorageAcl -Path $cleanup
+    Assert-FleetStorageTree -Path $stateDir
     try {
         $global:FleetStage='cleanup_registration'
         # Register cleanup before enabling the service; it is a protected local file.

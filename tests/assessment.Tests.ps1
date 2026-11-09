@@ -2,6 +2,16 @@ BeforeAll {
     . (Join-Path $PSScriptRoot '../src/remote_fleet_agent/assessment/Install-Assessment.ps1') -DotSource
 }
 Describe 'Bundled assessment installer guards' {
+    It 'rejects foreign cleanup owners and explicit non-admin write grants' {
+        Test-FleetStorageSecurity -OwnerSid 'S-1-5-21-999' -Rules @() | Should -BeFalse
+        $identity=[pscustomobject]@{Value='S-1-5-32-545'}
+        $identity | Add-Member ScriptMethod Translate {param($type);return $this}
+        $rules=@([pscustomobject]@{IdentityReference=$identity;AccessControlType='Allow';PropagationFlags=0;FileSystemRights=2})
+        Test-FleetStorageSecurity -OwnerSid 'S-1-5-32-544' -Rules $rules | Should -BeFalse
+        Test-FleetStorageSecurity -OwnerSid 'S-1-5-32-544' -Rules $rules -Parent | Should -BeTrue
+        $rules[0].FileSystemRights=64
+        Test-FleetStorageSecurity -OwnerSid 'S-1-5-18' -Rules $rules -Parent | Should -BeFalse
+    }
     It 'accepts SSH within single ports and ranges' {
         Test-PortIncludesSSH @('22') | Should -BeTrue
         Test-PortIncludesSSH @('20-30') | Should -BeTrue
@@ -45,6 +55,41 @@ Describe 'Bundled assessment installer guards' {
         Write-FleetState -State @{revision=2} -Path $path
         (Get-Content -LiteralPath $path -Raw | ConvertFrom-Json).revision | Should -Be 2
         (Get-Content -LiteralPath ($path+'.before-install') -Raw | ConvertFrom-Json).revision | Should -Be 1
+    }
+}
+
+Describe 'Native privileged cleanup storage' -Skip:($env:OS -ne 'Windows_NT') {
+    BeforeEach {
+        $script:securePath=Join-Path $env:ProgramData ('RemoteFleetSecurityTest-'+[guid]::NewGuid().ToString('N'))
+    }
+    AfterEach {
+        if(Test-Path -LiteralPath $script:securePath){Remove-Item -LiteralPath $script:securePath -Recurse -Force}
+    }
+    It 'creates a protected Administrators/SYSTEM directory and files' {
+        New-FleetStorageDirectory -Path $script:securePath
+        $acl=Get-Acl -LiteralPath $script:securePath
+        $acl.AreAccessRulesProtected | Should -BeTrue
+        $acl.GetOwner([Security.Principal.SecurityIdentifier]).Value | Should -Be 'S-1-5-32-544'
+        @($acl.Access).Count | Should -Be 2
+        $file=Join-Path $script:securePath 'cleanup.ps1'
+        'Write-Output fixture' | Set-Content -LiteralPath $file
+        Set-FleetStorageAcl -Path $file
+        Assert-FleetStorageTree -Path $script:securePath
+    }
+    It 'rejects a precreated directory with a user owner before trusting state' {
+        New-FleetStorageDirectory -Path $script:securePath
+        $acl=Get-Acl -LiteralPath $script:securePath
+        $acl.SetOwner([Security.Principal.WindowsIdentity]::GetCurrent().User)
+        Set-Acl -LiteralPath $script:securePath -AclObject $acl
+        {New-FleetStorageDirectory -Path $script:securePath} | Should -Throw '*Untrusted owner*'
+    }
+    It 'rejects an explicit writable Users grant on an existing directory' {
+        New-FleetStorageDirectory -Path $script:securePath
+        $acl=Get-Acl -LiteralPath $script:securePath
+        $sid=New-Object Security.Principal.SecurityIdentifier('S-1-5-32-545')
+        $acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule($sid,'Modify','Allow')))
+        Set-Acl -LiteralPath $script:securePath -AclObject $acl
+        {New-FleetStorageDirectory -Path $script:securePath} | Should -Throw '*write permissions*'
     }
 }
 Describe 'Scheduled cleanup arguments' {

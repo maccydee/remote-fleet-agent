@@ -275,7 +275,6 @@ CREATE TABLE IF NOT EXISTS scheduler_lease(id INTEGER PRIMARY KEY,owner TEXT,exp
         )
 
     def release_claim(self, ident: str, target: dict):
-        key = endpoint_key(target)
         root = (
             self.service.store.folder / "endpoint-locks"
             if target["simulation"]
@@ -289,8 +288,8 @@ CREATE TABLE IF NOT EXISTS scheduler_lease(id INTEGER PRIMARY KEY,owner TEXT,exp
             path.unlink()
         with self.service.store.db:
             self.service.store.db.execute(
-                "DELETE FROM endpoint_claims WHERE endpoint=? AND run_id=?",
-                (key, ident),
+                "DELETE FROM endpoint_claims WHERE run_id=? AND target=?",
+                (ident, target["name"]),
             )
 
     def claim_step(self, ident: str, target: dict, step: dict) -> bool:
@@ -506,8 +505,8 @@ CREATE TABLE IF NOT EXISTS scheduler_lease(id INTEGER PRIMARY KEY,owner TEXT,exp
                 claim.release()
                 with self.service.store.db:
                     self.service.store.db.execute(
-                        "DELETE FROM endpoint_claims WHERE endpoint=? AND run_id=?",
-                        (endpoint_key(target), ident),
+                        "DELETE FROM endpoint_claims WHERE run_id=? AND target=?",
+                        (ident, target["name"]),
                     )
 
     async def run(self, actor: dict, client: str, ident: str):

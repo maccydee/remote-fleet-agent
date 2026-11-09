@@ -58,7 +58,7 @@ def init_client(
     stage_dir.mkdir(parents=True, exist_ok=True)
     shutil.copy2(pub_path, stage_dir / "id_ed25519.pub")
     assets = files("remote_fleet_agent").joinpath("assessment")
-    for name in ("Install-Assessment.ps1", "Remove-Assessment.ps1"):
+    for name in ("Install-Assessment.ps1", "Remove-Assessment.ps1", "Protect-Assessment.ps1"):
         text = assets.joinpath(name).read_text(encoding="utf-8")
         (stage_dir / name).write_text(text, encoding="utf-8")
         (stage_dir / name.replace(".ps1", ".txt")).write_text(text, encoding="utf-8")

@@ -19,6 +19,12 @@ from mcp.server.mcpserver.exceptions import ToolError
 from mcp.types import ToolAnnotations
 
 
+class WorkspaceError(ValueError):
+    def __init__(self, message, code=None):
+        super().__init__(message)
+        self.code = code
+
+
 class WorkspaceClient:
     def __init__(self, url, token_file):
         parsed = urlsplit(url)
@@ -81,7 +87,10 @@ class WorkspaceClient:
                     )
                 result = json.loads(raw)
                 if response.status >= 400:
-                    raise ValueError(result.get("error", "Workspace request failed"))
+                    raise WorkspaceError(
+                        result.get("error", "Workspace request failed"),
+                        result.get("code"),
+                    )
                 return result, dict(response.getheaders())
             finally:
                 conn.close()
@@ -102,9 +111,10 @@ class WorkspaceClient:
                 path, body, {"Cookie": self.cookie, "X-Fleet-CSRF": self.csrf}
             )
             return result
-        except ValueError:
+        except WorkspaceError as exc:
             # A failed mutation is never replayed. A later explicit call may sign in again.
-            self.cookie = None
+            if exc.code == "session_expired":
+                self.cookie = None
             raise
 
     def close(self):

@@ -17,7 +17,7 @@ from urllib.parse import parse_qs, urlsplit
 
 from remote_fleet_agent.config import FleetConfig
 from remote_fleet_agent.live_service import LiveService
-from remote_fleet_agent.live_store import Conflict, Denied
+from remote_fleet_agent.live_store import Conflict, Denied, SessionExpired
 from remote_fleet_agent.storage import private_dir, read_json, save_json
 
 
@@ -211,13 +211,28 @@ class Application:
             self.login_attempts = [
                 t for t in self.login_attempts if (now - t).total_seconds() < 60
             ]
-            if len(self.login_attempts) >= 12:
-                raise Denied("Too many login attempts. Wait one minute.")
-            self.login_attempts.append(now)
             token = data.get("token")
-            if not isinstance(token, str) or len(token) > 256:
-                raise Denied("Invalid access token.")
-            actor = service.store.authenticate(token)
+            try:
+                if not isinstance(token, str) or not token or len(token) > 256:
+                    raise Denied("Invalid access token.")
+                actor = service.store.authenticate(token)
+            except Denied:
+                # High-entropy valid tokens must remain usable even if another local
+                # caller floods login. Bound failed-attempt state, not all sign-ins.
+                if len(self.login_attempts) >= 12:
+                    raise Denied(
+                        "Too many failed login attempts. Wait one minute."
+                    ) from None
+                self.login_attempts.append(now)
+                raise
+            self.sessions = {
+                k: v for k, v in self.sessions.items() if v["expires"] > now
+            }
+            own_sessions = [
+                k for k, v in self.sessions.items() if v["actor"] == actor["id"]
+            ]
+            for old in own_sessions[:-31]:
+                del self.sessions[old]
             ident = secrets.token_urlsafe(32)
             self.sessions[ident] = {
                 "actor": actor["id"],
@@ -226,11 +241,11 @@ class Application:
             }
             return {"signed_in": True, "_cookie": ident}
         if not session or session not in self.sessions:
-            raise Denied("Sign in with your operator access token.")
+            raise SessionExpired("Sign in with your operator access token.")
         info = self.sessions[session]
         if info["expires"] <= now:
             del self.sessions[session]
-            raise Denied("Session expired. Sign in again.")
+            raise SessionExpired("Session expired. Sign in again.")
         actor = service.store.operator(info["actor"])
         if method == "POST" and data.pop("_csrf", None) != info["csrf"]:
             raise Denied("Refresh this page before saving.")
@@ -606,6 +621,13 @@ class Application:
                     self.reply(200, json.dumps(result).encode(), cookie=newcookie)
                 except Conflict as exc:
                     self.reply(409, json.dumps({"error": str(exc)}).encode())
+                except SessionExpired as exc:
+                    self.reply(
+                        403,
+                        json.dumps(
+                            {"error": str(exc), "code": "session_expired"}
+                        ).encode(),
+                    )
                 except Denied as exc:
                     self.reply(403, json.dumps({"error": str(exc)}).encode())
                 except FileNotFoundError:

@@ -1,6 +1,8 @@
 [CmdletBinding()]
 param([Parameter(Mandatory)][string]$StateDirectory, [string]$ReportDirectory=(Join-Path $PSScriptRoot 'results'))
 $ErrorActionPreference='Stop'
+. (Join-Path $PSScriptRoot 'Protect-Assessment.ps1')
+Assert-FleetStorageTree -Path $StateDirectory
 $statePath=Join-Path $StateDirectory 'state.json'
 if (-not (Test-Path -LiteralPath $statePath)) { throw 'Assessment state is missing; stop and review rather than guessing the original configuration.' }
 $state=Get-Content -LiteralPath $statePath -Raw | ConvertFrom-Json

@@ -95,6 +95,7 @@ def test_posix_permissions_and_windows_acl_routing(tmp_path, monkeypatch):
         assert (folder / "secret").stat().st_mode & 0o777 == 0o600
     calls = []
     monkeypatch.setattr(host_platform.platform, "system", lambda: "Windows")
+    monkeypatch.setattr(host_platform, "validate_private_location", lambda _: None)
     monkeypatch.setattr(
         host_platform,
         "_windows_restrict",
@@ -298,6 +299,7 @@ def test_key_generation_needs_no_external_openssh(tmp_path, monkeypatch):
     # independently of that helper's subprocess implementation.
     if os.name == "nt":
         monkeypatch.setattr(host_platform, "_windows_restrict", lambda *_: None)
+        monkeypatch.setattr(host_platform, "validate_private_location", lambda _: None)
     init_client("example", stage_dir=tmp_path / "kit")
     private = tmp_path / "keys/example/id_ed25519"
     assert (

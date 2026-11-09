@@ -22,6 +22,12 @@ Cancellation stops future dispatch; it does not promise to undo a command alread
 
 Device exclusion is shared with the original support and maintenance interfaces. Production locks default to the controller account's persistent `~/.remote-fleet-agent/endpoint-locks` directory. All controller processes under that account use the same namespace; distinct independent controller accounts require coordinated deployment rather than an assumption of distributed exclusion. Configure an absolute persistent directory with `REMOTE_FLEET_ENDPOINT_LOCK_DIR` when needed. Keep it private and available across restarts. Never clear uncertain locks blindly.
 
+The controller stores a persistent device UUID and its verified address/key aliases in `device-identities.sqlite3` alongside the locks. Different workspaces, SSH accounts and overlapping host-key lists share that ID. A key rotation at an existing enrolled address retains the ID while changed pins still invalidate earlier approvals. No new service or installation is needed on the device.
+
+Different addresses with entirely disjoint verified key sets cannot establish identity automatically. Set the same `device_id` UUID on those approved host entries after verifying that they identify the same machine. An automatically assigned ID appears in real target review records; reuse that existing value when adding aliases. A fresh device can be given a generated UUID before its first registration. Conflicting existing IDs block administration and require enrollment review; the controller does not merge them while work may be active. Copied SSH server keys conservatively serialize the associated registrations.
+
+Stop all old controller processes before upgrading device locking. Outstanding old lock files remain effective and block new aliases. Reconcile the original work through its saved target record before removing a lock; an unknown result remains unknown. The new identity field requires fresh review of existing real investigation sessions and plans. Back up the identity registry with the workspace, and retain the lock directory when restoring either one.
+
 Full new diagnostic and execution history is retained in SQLite. Detail responses show recent entries; authenticated `/history?offset=0&limit=10` routes page through the remainder. Historical client/site permissions apply to both summaries and full records.
 
 ## Controller and AI clients
@@ -31,6 +37,8 @@ The same Python controller supports Windows, macOS and Linux. It stays bound to 
 Queue defaults are 64 runs and four active workers. `REMOTE_FLEET_MAX_QUEUE` and `REMOTE_FLEET_MAX_ACTIVE` accept validated bounds. Health is available to the owner at `/api/health`. Logs record lifecycle and correlated execution transitions without credentials or script bodies. First administration migration creates a private database backup. Restore into a separate directory and reconcile uncertain endpoint work before resuming.
 
 Provider-neutral MCP exposes request, read, proposal and approved-execution operations. Human decisions use the authenticated workspace. Claude, Codex, Gemini and other generated client formats use that fallback; a provider-specific human approval channel is not claimed without its own identity/binding verification. Existing client settings are not changed automatically.
+
+These roles separate API workflows. An AI process with filesystem access as the controller's OS account can also read that account's stored owner token or SSH key. Use separate OS identities or hosts, with restricted file access, when independent approval must withstand compromise of the AI process. Target confirmation permits arbitrary diagnostic scripts with the SSH account's privileges; those scripts can change state. Separate repair approval does not turn that investigation session into a read-only sandbox.
 
 ## Validation evidence
 
