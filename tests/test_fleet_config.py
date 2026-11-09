@@ -71,3 +71,28 @@ def test_missing_host_key_file_is_rejected(tmp_path):
     (tmp_path / "known_hosts").unlink()
     with pytest.raises(ValueError, match="known_hosts"):
         FleetConfig.load(path)
+
+
+@pytest.mark.parametrize("encoding", ["utf-8", "utf-8-sig"])
+def test_config_uses_utf8_independently_of_controller_locale(
+    tmp_path, monkeypatch, encoding
+):
+    from pathlib import Path
+
+    known = tmp_path / "verified-←.hosts"
+    known.write_text("# vérifié ←\nfixture-only", encoding="utf-8")
+    config = tmp_path / "fleet.json"
+    config.write_text(
+        json.dumps(
+            {"client": "test", "known_hosts": known.name, "hosts": []},
+            ensure_ascii=False,
+        ),
+        encoding=encoding,
+    )
+    original = Path.read_text
+
+    def locale_read(path, encoding=None, errors=None):
+        return original(path, encoding=encoding or "cp1252", errors=errors)
+
+    monkeypatch.setattr(Path, "read_text", locale_read)
+    assert FleetConfig.load(config).known_hosts == known

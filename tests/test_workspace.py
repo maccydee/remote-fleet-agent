@@ -124,8 +124,8 @@ def test_shareable_export_excludes_all_raw_identifiers_notes_and_script_payload(
     ws.add_manual(**fields())
     private = ws.export("dashboard", shareable=False)
     redacted = ws.export("dashboard", shareable=True)
-    source = Path(private["path"]).read_text()
-    safe = Path(redacted["path"]).read_text()
+    source = Path(private["path"]).read_text(encoding="utf-8")
+    safe = Path(redacted["path"]).read_text(encoding="utf-8")
     assert "Alice@example.test" in source and "\\u003c/script" in source
     for marker in (
         "client-secret",
@@ -140,7 +140,9 @@ def test_shareable_export_excludes_all_raw_identifiers_notes_and_script_payload(
     ):
         assert marker not in safe, marker
     assert "Host 001" in safe and "Asset 001" in safe
-    report = Path(ws.export("report", shareable=False)["path"]).read_text()
+    report = Path(ws.export("report", shareable=False)["path"]).read_text(
+        encoding="utf-8"
+    )
     assert "&lt;/script&gt;" in report and "<script>alert(1)" not in report
     assert "Not a compliance verdict" in safe
 
@@ -200,7 +202,7 @@ def test_retention_tamper_expiry_symlink_and_unrelated_files_fail_closed(tmp_pat
     with pytest.raises(ValueError, match="changed"):
         ws.apply_retention(p["id"], "wrong")
     record_path = ws.path / "retention" / (p["id"] + ".json")
-    record = json.loads(record_path.read_text())
+    record = json.loads(record_path.read_text(encoding="utf-8"))
     record["plan"]["files"][0]["path"] = "../../outside"
     save_json(record_path, record)
     with pytest.raises(ValueError, match="changed"):
@@ -213,7 +215,7 @@ def test_retention_tamper_expiry_symlink_and_unrelated_files_fail_closed(tmp_pat
     target.symlink_to(outside)
     with pytest.raises(ValueError, match="unsafe"):
         ws.apply_retention(p["id"], p["digest"])
-    assert outside.read_text() == "leave intact"
+    assert outside.read_text(encoding="utf-8") == "leave intact"
     assert (ws.path / "retention" / (p["id"] + ".json")).exists()
 
 
@@ -221,11 +223,11 @@ def test_retention_exports_explicitly_managed_copies_only(tmp_path):
     ws = workspace(tmp_path)
     result = ws.export("report")
     meta = Path(result["path"]).with_suffix(".json")
-    data = json.loads(meta.read_text())
+    data = json.loads(meta.read_text(encoding="utf-8"))
     data["created_at"] = (datetime.now(UTC) - timedelta(days=100)).isoformat()
     save_json(meta, data)
     external = tmp_path / "shared-copy.html"
-    external.write_text(Path(result["path"]).read_text())
+    external.write_text(Path(result["path"]).read_text(encoding="utf-8"))
     p = ws.preview_retention(90, 0)
     assert len(p["files"]) == 2
     ws.apply_retention(p["id"], p["digest"])

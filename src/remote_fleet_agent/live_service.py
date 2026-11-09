@@ -137,7 +137,7 @@ class LiveService:
         return digest(
             {
                 "entry": entry,
-                "config": Path(entry["config"]).read_text(),
+                "config": Path(entry["config"]).read_text(encoding="utf-8-sig"),
                 "known_hosts": hashlib.sha256(c.known_hosts.read_bytes()).hexdigest()
                 if c.known_hosts.is_file()
                 else None,

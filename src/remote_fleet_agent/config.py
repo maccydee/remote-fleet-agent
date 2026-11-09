@@ -36,7 +36,7 @@ class FleetConfig:
     @classmethod
     def load(cls, path: str | Path, *, require_known_hosts: bool = True) -> FleetConfig:
         path = Path(path).expanduser().resolve()
-        raw = json.loads(path.read_text())
+        raw = json.loads(path.read_text(encoding="utf-8-sig"))
         client = raw.get("client", "")
         if not isinstance(client, str) or not _NAME.fullmatch(client):
             raise ValueError(
@@ -58,7 +58,10 @@ class FleetConfig:
         if (
             require_known_hosts
             and not simulation
-            and (not known_path.is_file() or not known_path.read_text().strip())
+            and (
+                not known_path.is_file()
+                or not known_path.read_text(encoding="utf-8-sig").strip()
+            )
         ):
             raise ValueError(
                 "known_hosts must be an existing, nonempty verified host-key file"

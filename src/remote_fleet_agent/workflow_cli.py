@@ -107,7 +107,9 @@ def execute(args):
                     raise ValueError(
                         "additional export copy must be outside the managed store"
                     )
-                atomic_text(destination, Path(result["path"]).read_text())
+                atomic_text(
+                    destination, Path(result["path"]).read_text(encoding="utf-8-sig")
+                )
                 result["additional_copy"] = str(destination)
         elif args.mode == "manual-list":
             result = workspace.manual_records()
@@ -142,7 +144,7 @@ def execute(args):
         elif args.mode == "import-manual":
             if not args.input:
                 raise ValueError("import-manual needs --input")
-            document = json.loads(args.input.read_text())
+            document = json.loads(args.input.read_text(encoding="utf-8-sig"))
             if (
                 document.get("schema") != "fleet-manual-import-v1"
                 or document.get("client") != config.client

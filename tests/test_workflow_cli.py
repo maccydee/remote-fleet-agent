@@ -7,7 +7,16 @@ import pytest
 from remote_fleet_agent.cli import main
 
 
-def test_offline_cli_add_export_and_import_revision(tmp_path, capsys):
+@pytest.mark.parametrize("default_encoding", ["utf-8", "cp1252"])
+def test_offline_cli_add_export_and_import_revision(
+    tmp_path, capsys, monkeypatch, default_encoding
+):
+    original_read = Path.read_text
+
+    def locale_read(path, encoding=None, errors=None):
+        return original_read(path, encoding=encoding or default_encoding, errors=errors)
+
+    monkeypatch.setattr(Path, "read_text", locale_read)
     config = tmp_path / "fleet.json"
     config.write_text(
         json.dumps({"client": "offline", "known_hosts": "missing", "hosts": []})

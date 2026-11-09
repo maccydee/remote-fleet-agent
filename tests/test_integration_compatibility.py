@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import subprocess
 import sys
 import tomllib
@@ -113,22 +114,63 @@ def test_native_windows_private_storage_dacl(tmp_path):
     folder = private_dir(tmp_path / "private ü space")
     atomic_text(folder / "secret.json", "{}")
     for path in (folder, folder / "secret.json"):
-        result = subprocess.run(
-            [
-                "powershell.exe",
-                "-NoProfile",
-                "-NonInteractive",
-                "-Command",
-                "(Get-Acl -LiteralPath $env:FLEET_TEST_PRIVATE).Sddl",
-            ],
-            env={**os.environ, "FLEET_TEST_PRIVATE": str(path)},
-            check=True,
-            capture_output=True,
-            text=True,
-        )
-        sddl = result.stdout.strip()
-        assert "D:P" in sddl and ";;;SY)" in sddl
-        assert sddl.count("(A;") == 2 and ";;;BU)" not in sddl and ";;;WD)" not in sddl
+        sddl = windows_dacl_sddl(path)
+        from remote_fleet_agent.host_platform import _windows_sid
+
+        # Query the filesystem directly: no PowerShell module/profile dependency.
+        assert "D:P" in sddl
+        entries = re.findall(r"\(A;([^;]*);FA;;;([^;)]+)\)", sddl)
+        assert len(entries) == 2 and sddl.count("(") == 2, sddl
+        assert {sid for _, sid in entries} == {_windows_sid(), "SY"}, sddl
+        expected_flags = "OICI" if path.is_dir() else ""
+        assert all(flags == expected_flags for flags, _ in entries), sddl
+
+
+def windows_dacl_sddl(path):
+    """Read actual protected file permissions independently of the setter."""
+    import ctypes
+    from ctypes import wintypes
+
+    advapi = ctypes.WinDLL("advapi32", use_last_error=True)
+    kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+    advapi.GetNamedSecurityInfoW.argtypes = [
+        wintypes.LPWSTR,
+        wintypes.DWORD,
+        wintypes.DWORD,
+        ctypes.c_void_p,
+        ctypes.c_void_p,
+        ctypes.c_void_p,
+        ctypes.c_void_p,
+        ctypes.POINTER(ctypes.c_void_p),
+    ]
+    advapi.GetNamedSecurityInfoW.restype = wintypes.DWORD
+    advapi.ConvertSecurityDescriptorToStringSecurityDescriptorW.argtypes = [
+        ctypes.c_void_p,
+        wintypes.DWORD,
+        wintypes.DWORD,
+        ctypes.POINTER(wintypes.LPWSTR),
+        ctypes.POINTER(wintypes.DWORD),
+    ]
+    advapi.ConvertSecurityDescriptorToStringSecurityDescriptorW.restype = wintypes.BOOL
+    kernel.LocalFree.argtypes = [ctypes.c_void_p]
+    kernel.LocalFree.restype = ctypes.c_void_p
+    descriptor = ctypes.c_void_p()
+    status = advapi.GetNamedSecurityInfoW(
+        str(path.resolve()), 1, 4, None, None, None, None, ctypes.byref(descriptor)
+    )
+    if status:
+        raise ctypes.WinError(status)
+    text = wintypes.LPWSTR()
+    try:
+        if not advapi.ConvertSecurityDescriptorToStringSecurityDescriptorW(
+            descriptor, 1, 4, ctypes.byref(text), None
+        ):
+            raise ctypes.WinError(ctypes.get_last_error())
+        return text.value
+    finally:
+        if text:
+            kernel.LocalFree(text)
+        kernel.LocalFree(descriptor)
 
 
 async def test_doctor_negotiates_real_stdio_and_simulated_tools(tmp_path):

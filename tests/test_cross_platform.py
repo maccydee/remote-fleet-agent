@@ -202,8 +202,10 @@ def test_demo_has_seven_platforms_scenarios_and_no_key(tmp_path):
     assert redacted["simulation"] is True and all(
         h["simulation"] for h in redacted["hosts"]
     )
-    assert "Simulation mode" in Path(result["dashboard"]).read_text()
-    assert "SIMULATED / FICTIONAL" in (tmp_path / "demo/report.html").read_text()
+    assert "Simulation mode" in Path(result["dashboard"]).read_text(encoding="utf-8")
+    assert "SIMULATED / FICTIONAL" in (tmp_path / "demo/report.html").read_text(
+        encoding="utf-8"
+    )
 
 
 def test_demo_does_not_overwrite_unrelated_files(tmp_path):
@@ -242,14 +244,25 @@ async def test_unix_failures_remain_unknown_and_do_not_become_passes():
     assert {"low_disk", "security_gap"} <= {i["code"] for i in issues}
 
 
-def test_probe_allows_only_fixed_selection_and_checks_remote_kernel():
+def test_probe_allows_only_fixed_selection():
     for values in [
         ("linux", "inventory", "arbitrary;touch /tmp/pwn"),
         ("windows", "inventory", "os"),
     ]:
         with pytest.raises(ValueError):
             build_command(*values)
-    # Run a Linux probe locally on this Mac: the mismatch must be unknown, not fabricated OS evidence.
+    for platform in ("linux", "macos"):
+        command = build_command(platform, "inventory", "os")
+        assert command.startswith("python3 -c ")
+        assert command.endswith(platform + " inventory os")
+
+
+@pytest.mark.skipif(
+    os.name == "nt",
+    reason="Executes POSIX probe through local sh/python3 with Unix pwd/grp modules",
+)
+def test_local_posix_probe_checks_remote_kernel():
+    # Local execution validates the kernel guard on a real POSIX interpreter.
     result = subprocess.run(
         build_command("linux", "inventory", "os"),
         shell=True,
