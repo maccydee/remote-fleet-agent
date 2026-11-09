@@ -960,6 +960,8 @@ Resolve the Windows machine from the current private enrollment; screenshots fro
 
 ### Task 21: Validate this native Mac and controller-host portability ⚪ BLOCKED
 
+**Controller follow-up 2026-11-09:** Native Windows/macOS/Linux CI passed on Python 3.11 and 3.13, including package builds; see [verified matrix](https://github.com/maccydee/remote-fleet-agent/actions/runs/42546966870). This clears the Windows controller gate. Native Mac SSH and the enrolled-target repair workflow remain blocked.
+
 **Execution 2026-11-08:** macOS controller tests PASS; actual installed wheel 83 tests PASS. Native Mac target TCP22 refuses SSH, so native repair BLOCKED. Linux installed controller 83 tests PASS; Windows controller NOT_RUN locally. CI matrix supplied, not claimed executed.
 
 **Files:**

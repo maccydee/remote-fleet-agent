@@ -31,3 +31,11 @@ Ten fictional screenshots and a 23.72-second browser recording were captured and
 ## First GitHub controller matrix — 2026-11-09
 
 The native Windows controller jobs have now run on Python 3.11 and 3.13. Both reported 13 failures, 370 passes and 10 skips. Findings include Windows text encoding, POSIX-only local probe/scratch fixtures, and the ACL inspection test. This supersedes the earlier Windows-controller NOT_RUN entry; it does not establish passing Windows controller support. The original failure evidence is retained in [CI run 42545630844](https://github.com/maccydee/remote-fleet-agent/actions/runs/42545630844). The separate full-history secret scan passed.
+
+## Verified controller fixes — 2026-11-09
+
+[Run 42546966870](https://github.com/maccydee/remote-fleet-agent/actions/runs/42546966870) passed the complete controller matrix at commit `0d5c191`: Windows Python 3.11 and 3.13 each passed 395 tests with 18 skips; macOS and Linux Python 3.11 and 3.13 each passed 400 tests with 13 skips. Chromium passed 26 browser tests. All six package builds passed. The separate full-history secret check passed. This supersedes the initial Windows CI failure status above.
+
+Fixes include explicit UTF-8/BOM-aware configuration/import/export reads; UTF-8 HTML test fixtures; endpoint-native manifest paths; separate POSIX and Windows local scratch execution; numeric native ACL inspection that preserves exact SID, access mask and inheritance assertions; and plain-string marker serialization in the Windows scratch verifier. Native Windows scratch repair/recovery/cleanup and refusal guards ran locally on the CI hosts.
+
+Windows skips are ten opt-in endpoint tests plus eight POSIX-only execution cases. macOS/Linux skips are ten opt-in endpoint tests plus three Windows-only execution cases. Shared schema and command construction checks run everywhere. These are controller and local-component results, not proof that the full human-approved native SSH repair workflow or Outlook/driver scenarios completed. Those endpoint and provider gates remain pending.

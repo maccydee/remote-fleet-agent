@@ -121,3 +121,9 @@ Keep these evidence categories separate when reporting compatibility:
 | Controller native test passes | The controller, HTTP service and subprocesses ran on that host OS |
 
 Presence of Claude Code or Codex on a computer proves installation only. An untested provider stays `NOT_RUN`. A Mac driving Docker Linux endpoints is macOS-controller-to-Linux-container evidence; it does not validate Windows hosting. Docker Linux controller tests must be identified as container runs. Native macOS requires an actual Mac SSH session, and native Windows requires the currently enrolled test PC. Do not enable Remote Login or reinstall OpenSSH merely to turn a missing prerequisite into a pass.
+
+## Verified native controller matrix — 2026-11-09
+
+The [complete GitHub matrix](https://github.com/maccydee/remote-fleet-agent/actions/runs/42546966870) passed on Python 3.11 and 3.13 for Windows, macOS and Linux. Windows passed 395 tests with 18 skips per version; macOS/Linux passed 400 with 13 skips per version. The native Windows check verifies actual NTFS DACLs and runs local PowerShell scratch repair/recovery/cleanup and refusal tests. All six wheel/source builds and the 26-test Chromium suite passed.
+
+This establishes native controller coverage and local script components. It does not validate every 3×3 controller/target combination, an interactive provider application or a full live endpoint repair. Opt-in endpoint tests still require their enrolled scope and separate human decision.

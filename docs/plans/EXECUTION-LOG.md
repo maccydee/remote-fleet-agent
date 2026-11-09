@@ -340,3 +340,8 @@ The first Windows matrix run exposed 13 failures on Python 3.11 and 3.13. Do not
 ### Windows native follow-up — run 42546535443
 
 macOS/Linux (both Python versions) and browser jobs passed; Windows was reduced to three failures on each version (392 passed/18 skipped). Native DACL readback succeeded, but Windows canonicalized the runner's numeric SID as LA, so validation now reads actual ACE SIDs and access masks through GetAce/ConvertSidToStringSidW rather than comparing SDDL aliases. The added Windows scratch cycle exposed Windows PowerShell serializing Get-Content metadata alongside its string; the check now reads the marker as a plain .NET string. One copied-HTML fixture also needed explicit UTF-8 writing. These native failures supplied RED evidence; rerunning the matrix after fixes.
+
+
+### Windows native verification — GREEN
+
+[Run 42546966870](https://github.com/maccydee/remote-fleet-agent/actions/runs/42546966870) at `0d5c191` passed all seven jobs: six native OS/Python matrix combinations plus Chromium. Windows: 395 passed/18 skipped on Python 3.11 and 3.13. macOS/Linux: 400 passed/13 skipped on each version. Browser: 26 passed. All six package builds passed. Full-history secret checks passed. The Windows ACL getter and PowerShell scratch cycle now ran on actual Windows hosts. No customer endpoint was modified. Original uncertainty, approval and enrolled-target gates remain unchanged. Updated README and compatibility/release evidence to replace the pending Windows-controller status. Private logs and JSON job evidence retained under the Codex task workspace/work/git-setup/windows-ci-verified.*.

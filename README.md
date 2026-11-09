@@ -158,21 +158,25 @@ Start with [deployment and enrollment](docs/DEPLOYMENT.md), [scope and access po
 
 ## Validation status
 
-The **8 November 2026** build was checked with:
+The [**9 November 2026 GitHub matrix**](https://github.com/maccydee/remote-fleet-agent/actions/runs/42546966870) passed on Python **3.11 and 3.13**:
 
 | Evidence | Result |
 | --- | --- |
-| Python regression suite | **382 passed**, 11 skipped |
+| Native Windows controller | **395 passed**, 18 skipped on each Python version |
+| Native macOS controller | **400 passed**, 13 skipped on each Python version |
+| Linux controller | **400 passed**, 13 skipped on each Python version |
 | Chromium browser suite | **26 passed** |
-| Installed macOS controller package | **83 passed** |
-| Installed Linux controller package, isolated container | **83 passed** |
-| Windows endpoint and two Linux Docker endpoints | Pinned SSH read-only checks completed |
-| New native repair/recovery cycles | Not completed across the target platforms |
+| Wheel and source-distribution builds | Passed on all six OS/Python combinations |
+| Windows private storage | Native NTFS permissions checked for the current account and SYSTEM |
+| Windows scratch scripts | Local PowerShell repair, recovery, cleanup and sentinel guards passed |
+| Windows endpoint and two Linux Docker endpoints | Earlier pinned SSH read-only checks completed |
+| Full native repair workflow across enrolled targets | Still pending separate enrollment and human approvals |
 | Native macOS target | SSH prerequisite unavailable in the test environment |
-| Windows controller CI, 9 November | Initial native run exposed compatibility failures; fixes pending |
 | Interactive AI-client workflows | Not yet verified in each provider application |
 
-The [first Windows controller CI run](https://github.com/maccydee/remote-fleet-agent/actions/runs/42545630844) exposed encoding, platform-specific fixture and ACL-check failures. Windows controller support remains under validation. The badges at the top show the current CI results. Unit tests, simulations, real SSH collection and native repairs establish different things. See [release evidence and remaining gates](docs/SUPPORT-RELEASE-GATES.md) for the limits; a container test does not establish native GUI, systemd or physical-device behaviour.
+Windows skips include POSIX-only local execution tests and the opt-in native endpoint tests. macOS/Linux skips include Windows-only local execution tests and those same endpoint gates. All platforms retain remote command-construction checks. Local scratch tests exercise generated scripts; they do not establish a full approved repair over SSH.
+
+The badges at the top show the current CI results. See [release evidence and remaining gates](docs/SUPPORT-RELEASE-GATES.md) for the limits; a container test does not establish native GUI, systemd or physical-device behaviour.
 
 ## Documentation
 
