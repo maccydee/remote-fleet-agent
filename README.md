@@ -141,6 +141,8 @@ The AI client handles its own model credentials. Remote Fleet needs no separate 
 
 In **Settings → Operators**, create a dedicated **technician** operator for the AI and limit its clients and sites. Save its token in a private file outside the repository. Keep your owner or manager token for human decisions; the AI bridge refuses those approval roles.
 
+For independent approval credentials, run the AI and controller under separate OS identities or hosts with restricted filesystem access. An AI process with the controller account's filesystem access can read that account's stored credentials.
+
 With the workspace running, launch the support bridge using your environment's Python:
 
 ```sh
@@ -163,7 +165,7 @@ Enrol explicitly authorised devices with verified SSH host keys. Keep the engage
 | --- | --- |
 | **Target scope** | Only enrolled, approved devices; no automatic network discovery. |
 | **Investigation** | Named-target confirmation, bounded output and timeouts. Custom scripts retain account privileges and can change state. |
-| **Repair approval** | A separate human approves the exact plan revision in the workspace. The AI cannot approve its own proposal. |
+| **Repair approval** | An engineer approves the exact plan revision. Technician API credentials cannot approve; independent credentials require OS/file-access separation. |
 | **Interrupted work** | Unknown outcomes are retained and blocked from automatic replay. |
 | **Cancellation** | Prevents further dispatch; it cannot undo a command already sent. |
 | **Recovery** | Runs only the recovery steps and conditions in the approved plan. |
