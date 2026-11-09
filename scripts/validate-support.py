@@ -155,7 +155,7 @@ def scratch_scripts(target: dict[str, Any], run_id: str, action: str) -> dict[st
         if expected is None:
             check = prefix + "@{passed=(!(Test-Path -LiteralPath $p));check_passed=(!(Test-Path -LiteralPath $p));cleanup_verified=(!(Test-Path -LiteralPath $p))} | ConvertTo-Json -Compress\n"
         else:
-            check = prefix + guard + "@{passed=((Get-Content -LiteralPath $m -Raw) -ceq " + quote(expected) + ");check_passed=((Get-Content -LiteralPath $m -Raw) -ceq " + quote(expected) + ");content=(Get-Content -LiteralPath $m -Raw)} | ConvertTo-Json -Compress\n"
+            check = prefix + guard + "@{passed=((Get-Content -LiteralPath $m -Raw) -ceq " + quote(expected) + ");check_passed=((Get-Content -LiteralPath $m -Raw) -ceq " + quote(expected) + ");content=[IO.File]::ReadAllText($m)} | ConvertTo-Json -Compress\n"
     else:
         # Python performs exact-child and no-symlink validation. No shell-interpolated paths.
         data = json.dumps({"parent": parent, "path": scratch, "run": run_id, "action": action})

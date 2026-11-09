@@ -1,6 +1,5 @@
 import json
 import os
-import re
 import subprocess
 import sys
 import tomllib
@@ -114,22 +113,39 @@ def test_native_windows_private_storage_dacl(tmp_path):
     folder = private_dir(tmp_path / "private ü space")
     atomic_text(folder / "secret.json", "{}")
     for path in (folder, folder / "secret.json"):
-        sddl = windows_dacl_sddl(path)
+        acl = windows_dacl(path)
         from remote_fleet_agent.host_platform import _windows_sid
 
-        # Query the filesystem directly: no PowerShell module/profile dependency.
-        assert "D:P" in sddl
-        entries = re.findall(r"\(A;([^;]*);FA;;;([^;)]+)\)", sddl)
-        assert len(entries) == 2 and sddl.count("(") == 2, sddl
-        assert {sid for _, sid in entries} == {_windows_sid(), "SY"}, sddl
-        expected_flags = "OICI" if path.is_dir() else ""
-        assert all(flags == expected_flags for flags, _ in entries), sddl
+        # Numeric SIDs avoid machine-specific aliases such as LA (local admin).
+        assert acl["protected"]
+        entries = acl["entries"]
+        assert len(entries) == 2
+        assert {entry["sid"] for entry in entries} == {_windows_sid(), "S-1-5-18"}
+        expected_flags = 3 if path.is_dir() else 0  # OBJECT/CONTAINER_INHERIT
+        assert all(entry["flags"] == expected_flags for entry in entries)
+        assert all(entry["mask"] == 0x1F01FF for entry in entries)  # FILE_ALL_ACCESS
 
 
-def windows_dacl_sddl(path):
-    """Read actual protected file permissions independently of the setter."""
+def windows_dacl(path):
+    """Read actual ACEs independently of the setter and SDDL account aliases."""
     import ctypes
     from ctypes import wintypes
+
+    class AclSize(ctypes.Structure):
+        _fields_ = [
+            ("count", wintypes.DWORD),
+            ("used", wintypes.DWORD),
+            ("free", wintypes.DWORD),
+        ]
+
+    class AllowedAce(ctypes.Structure):
+        _fields_ = [
+            ("type", ctypes.c_ubyte),
+            ("flags", ctypes.c_ubyte),
+            ("size", wintypes.WORD),
+            ("mask", wintypes.DWORD),
+            ("sid", wintypes.DWORD),
+        ]
 
     advapi = ctypes.WinDLL("advapi32", use_last_error=True)
     kernel = ctypes.WinDLL("kernel32", use_last_error=True)
@@ -139,37 +155,82 @@ def windows_dacl_sddl(path):
         wintypes.DWORD,
         ctypes.c_void_p,
         ctypes.c_void_p,
-        ctypes.c_void_p,
+        ctypes.POINTER(ctypes.c_void_p),
         ctypes.c_void_p,
         ctypes.POINTER(ctypes.c_void_p),
     ]
     advapi.GetNamedSecurityInfoW.restype = wintypes.DWORD
-    advapi.ConvertSecurityDescriptorToStringSecurityDescriptorW.argtypes = [
+    advapi.GetSecurityDescriptorControl.argtypes = [
+        ctypes.c_void_p,
+        ctypes.POINTER(wintypes.WORD),
+        ctypes.POINTER(wintypes.DWORD),
+    ]
+    advapi.GetSecurityDescriptorControl.restype = wintypes.BOOL
+    advapi.GetAclInformation.argtypes = [
+        ctypes.c_void_p,
         ctypes.c_void_p,
         wintypes.DWORD,
         wintypes.DWORD,
-        ctypes.POINTER(wintypes.LPWSTR),
-        ctypes.POINTER(wintypes.DWORD),
     ]
-    advapi.ConvertSecurityDescriptorToStringSecurityDescriptorW.restype = wintypes.BOOL
+    advapi.GetAclInformation.restype = wintypes.BOOL
+    advapi.GetAce.argtypes = [
+        ctypes.c_void_p,
+        wintypes.DWORD,
+        ctypes.POINTER(ctypes.c_void_p),
+    ]
+    advapi.GetAce.restype = wintypes.BOOL
+    advapi.ConvertSidToStringSidW.argtypes = [
+        ctypes.c_void_p,
+        ctypes.POINTER(wintypes.LPWSTR),
+    ]
+    advapi.ConvertSidToStringSidW.restype = wintypes.BOOL
     kernel.LocalFree.argtypes = [ctypes.c_void_p]
     kernel.LocalFree.restype = ctypes.c_void_p
-    descriptor = ctypes.c_void_p()
+    descriptor, dacl = ctypes.c_void_p(), ctypes.c_void_p()
     status = advapi.GetNamedSecurityInfoW(
-        str(path.resolve()), 1, 4, None, None, None, None, ctypes.byref(descriptor)
+        str(path.resolve()),
+        1,
+        4,
+        None,
+        None,
+        ctypes.byref(dacl),
+        None,
+        ctypes.byref(descriptor),
     )
     if status:
         raise ctypes.WinError(status)
-    text = wintypes.LPWSTR()
     try:
-        if not advapi.ConvertSecurityDescriptorToStringSecurityDescriptorW(
-            descriptor, 1, 4, ctypes.byref(text), None
+        assert dacl.value, "A NULL DACL would permit unrestricted access"
+        control, revision = wintypes.WORD(), wintypes.DWORD()
+        if not advapi.GetSecurityDescriptorControl(
+            descriptor, ctypes.byref(control), ctypes.byref(revision)
         ):
             raise ctypes.WinError(ctypes.get_last_error())
-        return text.value
+        size = AclSize()
+        if not advapi.GetAclInformation(
+            dacl, ctypes.byref(size), ctypes.sizeof(size), 2
+        ):
+            raise ctypes.WinError(ctypes.get_last_error())
+        entries = []
+        for index in range(size.count):
+            pointer = ctypes.c_void_p()
+            if not advapi.GetAce(dacl, index, ctypes.byref(pointer)):
+                raise ctypes.WinError(ctypes.get_last_error())
+            ace = ctypes.cast(pointer, ctypes.POINTER(AllowedAce)).contents
+            assert ace.type == 0 and ace.size >= ctypes.sizeof(AllowedAce), (
+                "Unexpected non-allow ACE"
+            )
+            sid = wintypes.LPWSTR()
+            if not advapi.ConvertSidToStringSidW(
+                pointer.value + AllowedAce.sid.offset, ctypes.byref(sid)
+            ):
+                raise ctypes.WinError(ctypes.get_last_error())
+            try:
+                entries.append({"sid": sid.value, "mask": ace.mask, "flags": ace.flags})
+            finally:
+                kernel.LocalFree(sid)
+        return {"protected": bool(control.value & 0x1000), "entries": entries}
     finally:
-        if text:
-            kernel.LocalFree(text)
         kernel.LocalFree(descriptor)
 
 

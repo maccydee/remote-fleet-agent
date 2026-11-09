@@ -227,7 +227,9 @@ def test_retention_exports_explicitly_managed_copies_only(tmp_path):
     data["created_at"] = (datetime.now(UTC) - timedelta(days=100)).isoformat()
     save_json(meta, data)
     external = tmp_path / "shared-copy.html"
-    external.write_text(Path(result["path"]).read_text(encoding="utf-8"))
+    external.write_text(
+        Path(result["path"]).read_text(encoding="utf-8"), encoding="utf-8"
+    )
     p = ws.preview_retention(90, 0)
     assert len(p["files"]) == 2
     ws.apply_retention(p["id"], p["digest"])
