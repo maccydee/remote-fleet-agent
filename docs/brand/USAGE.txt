@@ -1,0 +1,10 @@
+REMOTE FLEET / BRAND 01
+
+The mark joins three endpoints through one route, forming an F.
+Primary: violet #7156D9, ink #282337, lavender #D9CDFE.
+Reversed: use on dark backgrounds. Mono variants: use for one-colour applications.
+SVG masters scale without loss; the wordmark uses outlined lettering.
+PNG exports have transparent backgrounds. Keep the aspect ratio intact.
+Minimum mark size: 24 px. Clear space: one quarter of the mark width on each side.
+Do not stretch, rotate or add shadows. Keep enough contrast around the mark.
+Designed for Remote Fleet; no trademark availability search has been performed.

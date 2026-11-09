@@ -1,0 +1,16 @@
+# Example only. Replace paths/account; install through your approved change process.
+[Unit]
+Description=Remote Fleet loopback controller
+After=network-online.target
+[Service]
+Type=simple
+User=remote-fleet
+WorkingDirectory=/opt/remote-fleet
+ExecStart=/opt/remote-fleet/.venv/bin/remote-fleet-agent workspace-app serve --directory /var/lib/remote-fleet/workspace --port 8877
+Restart=on-failure
+RestartSec=10
+TimeoutStopSec=15
+UMask=0077
+NoNewPrivileges=true
+[Install]
+WantedBy=multi-user.target

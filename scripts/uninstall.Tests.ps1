@@ -36,11 +36,11 @@ Describe "Invoke-Uninstall" {
         Mock Remove-EngineerKey { }
         Mock Remove-ScopedFirewallRule { }
         Mock Unregister-ScheduledTask { }
-        Mock Disable-WindowsOptionalFeature { } -Verifiable
+        Mock Remove-WindowsCapability { } -Verifiable
 
         $receipt = Invoke-Uninstall -StatePath $statePath
 
-        Should -Invoke Disable-WindowsOptionalFeature -Times 0
+        Should -Invoke Remove-WindowsCapability -Times 0
         $receipt.ssh_left_running | Should -Be $true
     }
 
@@ -52,12 +52,52 @@ Describe "Invoke-Uninstall" {
         Mock Remove-EngineerKey { }
         Mock Remove-ScopedFirewallRule { }
         Mock Unregister-ScheduledTask { }
-        Mock Disable-WindowsOptionalFeature { } -Verifiable
+        Mock Get-WindowsCapability { [PSCustomObject]@{ State = "Installed" } }
+        Mock Remove-WindowsCapability { } -Verifiable
 
         $receipt = Invoke-Uninstall -StatePath $statePath
 
         Should -InvokeVerifiable
         $receipt.ssh_left_running | Should -Be $false
+        $receipt.removed | Should -Contain "openssh_server"
+    }
+
+    It "skips Remove-WindowsCapability entirely when the capability is already absent" {
+        # (WHY: live testing (2026-11-03) found this exact call could hang
+        # indefinitely with zero feedback on a machine with a flaky path to
+        # Windows Update/DISM - the same bug already fixed on the install
+        # side (A-010/A-011). Checking first and skipping when already
+        # NotPresent avoids the unnecessary call in the common case.)
+        $statePath = Join-Path $TestDrive "state4.json"
+        @{ ssh_was_already_enabled = $false; installed_at = "2026-10-24T00:00:00Z"; ssh_key_added = "ssh-ed25519 AAAA..." } |
+            ConvertTo-Json | Set-Content $statePath
+
+        Mock Remove-EngineerKey { }
+        Mock Remove-ScopedFirewallRule { }
+        Mock Unregister-ScheduledTask { }
+        Mock Get-WindowsCapability { [PSCustomObject]@{ State = "NotPresent" } }
+        Mock Remove-WindowsCapability { }
+
+        $receipt = Invoke-Uninstall -StatePath $statePath
+
+        Should -Invoke Remove-WindowsCapability -Times 0
+        $receipt.removed | Should -Not -Contain "openssh_server"
+    }
+
+    It "does not fail the whole uninstall if capability removal itself errors" {
+        $statePath = Join-Path $TestDrive "state5.json"
+        @{ ssh_was_already_enabled = $false; installed_at = "2026-10-24T00:00:00Z"; ssh_key_added = "ssh-ed25519 AAAA..." } |
+            ConvertTo-Json | Set-Content $statePath
+
+        Mock Remove-EngineerKey { }
+        Mock Remove-ScopedFirewallRule { }
+        Mock Unregister-ScheduledTask { }
+        Mock Get-WindowsCapability { [PSCustomObject]@{ State = "Installed" } }
+        Mock Remove-WindowsCapability { throw "boom" }
+
+        $receipt = Invoke-Uninstall -StatePath $statePath
+        $receipt.removed | Should -Contain "ssh_key"
+        $receipt.removed | Should -Not -Contain "openssh_server"
     }
 
     It "produces a receipt with a timestamp and removal list" {

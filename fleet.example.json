@@ -1,0 +1,21 @@
+{
+  "client": "example",
+  "known_hosts": "./known_hosts",
+  "concurrency": 4,
+  "maintenance_actions": [],
+  "query_timeout_seconds": 30,
+  "hosts": [
+    {
+      "name": "office-01",
+      "target": "Engineer@192.0.2.10",
+      "approved": true,
+      "groups": ["office"]
+    },
+    {
+      "name": "office-02",
+      "target": "Engineer@192.0.2.11",
+      "approved": true,
+      "groups": ["office"]
+    }
+  ]
+}

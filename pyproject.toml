@@ -1,25 +1,41 @@
 [project]
 name = "remote-fleet-agent"
-version = "0.1.0"
+version = "0.9.0"
 requires-python = ">=3.11"
+classifiers = [
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: MacOS",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+]
 dependencies = [
     # server.py is built on mcp.server.mcpserver.MCPServer, which only
     # exists in the 2.x line (mcp.server.fastmcp.FastMCP was renamed/moved
     # there) - see docs/plans/EXECUTION-LOG.md A-006.
     "mcp>=2.0.0",
     "asyncssh>=2.14.0",
+    "tzdata; sys_platform == 'win32'",
 ]
 
 [project.optional-dependencies]
+browser = ["pytest-playwright>=0.10,<0.11"]
 dev = ["pytest>=8.0", "pytest-asyncio>=0.23", "ruff>=0.6"]
 
 [project.scripts]
 remote-fleet-agent = "remote_fleet_agent.cli:main"
+remote-fleet-mcp = "remote_fleet_agent.launcher:main"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
 testpaths = ["tests"]
 
 [build-system]
 requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
+
+[tool.setuptools.package-data]
+remote_fleet_agent = ["assessment/*.ps1", "lab_assets/*", "app_assets/*"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["remote_fleet_agent"]

@@ -6,17 +6,97 @@ function Test-OpenSSHEnabled {
 }
 
 function Enable-OpenSSHServer {
-    param([Parameter(Mandatory)][string]$StatePath)
+    param(
+        [Parameter(Mandatory)][string]$StatePath,
+        [string]$LocalSourcePath,
+        [int]$MaxAttempts = 3,
+        [int]$RetryDelaySeconds = 5
+    )
 
     $alreadyEnabled = Test-OpenSSHEnabled
     if (-not $alreadyEnabled) {
-        # (WHY: Add-WindowsCapability/Enable-WindowsOptionalFeature is the
-        # documented in-box way to install OpenSSH.Server on Windows
-        # 10/11 and Server, keeping this offline-friendly unless WSUS
-        # blocks the feature - see ASSUMPTIONS.md.)
-        Enable-WindowsOptionalFeature -Online -FeatureName "OpenSSH.Server" -NoRestart
-        Start-Service sshd
-        Set-Service -Name sshd -StartupType Automatic
+        # (WHY: OpenSSH Server is a Windows Capability, not an Optional
+        # Feature - Add-WindowsCapability is the correct cmdlet on Windows
+        # 10/11 and Server. Enable-WindowsOptionalFeature silently no-ops
+        # on this capability name instead of erroring, which is why this
+        # was wrong for a while without being caught - see ASSUMPTIONS.md
+        # on WSUS potentially blocking the Windows Update fetch.)
+        $capabilityName = "OpenSSH.Server~~~~0.0.1.0"
+        $lastError = $null
+
+        # (WHY: live testing (2026-11-03) found Add-WindowsCapability can
+        # hang for a long time with zero console feedback when the capability
+        # is ALREADY installed and this machine's path to Windows Update is
+        # flaky - the add call still tries to contact WU to re-verify, even
+        # though there's nothing to do. Checking first and skipping the add
+        # entirely when it's already Installed avoids that call completely
+        # in the common "already done" case, which is exactly what made the
+        # script look hung with no way to tell if it was working.)
+        Write-Output "Checking OpenSSH.Server capability..."
+        $capability = Get-WindowsCapability -Online -Name $capabilityName
+        $installed = ($capability.State -eq "Installed")
+
+        if ($installed) {
+            Write-Output "OpenSSH.Server capability already installed - skipping install."
+        } else {
+            # (WHY: live testing also hit a transient Add-WindowsCapability
+            # failure - Error 87 "capability name not recognized" - that
+            # cleared on an immediate retry of the exact same command. A
+            # single attempt is not reliable; retry a few times before giving
+            # up. -Source lets an engineer point at a local sxs folder from
+            # install media when the client network blocks Windows
+            # Update/WSUS for FOD content - still Microsoft-signed content,
+            # just a different source, never a bundled third-party binary.)
+            Write-Output "Installing OpenSSH.Server capability - this can take a minute or two on first install..."
+            for ($attempt = 1; $attempt -le $MaxAttempts; $attempt++) {
+                try {
+                    if ($LocalSourcePath) {
+                        Add-WindowsCapability -Online -Name $capabilityName -Source $LocalSourcePath -ErrorAction Stop
+                    } else {
+                        Add-WindowsCapability -Online -Name $capabilityName -ErrorAction Stop
+                    }
+                } catch {
+                    $lastError = $_
+                }
+
+                $capability = Get-WindowsCapability -Online -Name $capabilityName
+                if ($capability.State -eq "Installed") {
+                    $installed = $true
+                    break
+                }
+
+                Write-Output "Attempt $attempt of $MaxAttempts did not complete (state: $($capability.State))."
+                if ($attempt -lt $MaxAttempts) {
+                    Start-Sleep -Seconds $RetryDelaySeconds
+                }
+            }
+        }
+
+        if (-not $installed) {
+            $sourceHint = if ($LocalSourcePath) { "local source '$LocalSourcePath'" } else { "Windows Update" }
+            $errorDetail = if ($lastError) { " Last error: $($lastError.Exception.Message)" } else { "" }
+            throw "OpenSSH.Server capability did not install after $MaxAttempts attempt(s) via $sourceHint " +
+                "- final state '$($capability.State)'.$errorDetail " +
+                "If this network blocks Windows Update/WSUS for Feature-on-Demand content, re-run with " +
+                "-LocalSourcePath pointing at a matching sxs folder from Windows install media. If the " +
+                "state stays NotPresent with DownloadSize/InstallSize both 0, this build may not have a " +
+                "published OpenSSH package at all (seen on Insider/Canary builds) - try a different machine."
+        }
+
+        Write-Output "Starting sshd service..."
+        Start-Service sshd -ErrorAction Stop
+        Set-Service -Name sshd -StartupType Automatic -ErrorAction Stop
+
+        # (WHY: a service can report started and then exit immediately -
+        # e.g. host-key generation failing - so confirm it is still running
+        # a moment later rather than trusting Start-Service alone.)
+        Start-Sleep -Seconds 2
+        $svc = Get-Service -Name sshd
+        if ($svc.Status -ne "Running") {
+            throw "sshd service started but is now '$($svc.Status)', not Running - check Windows Event " +
+                "Viewer > Applications and Services Logs > OpenSSH for the cause."
+        }
+        Write-Output "sshd service is running."
     }
 
     $state = @{ ssh_was_already_enabled = $alreadyEnabled; installed_at = (Get-Date).ToUniversalTime().ToString("o") }
@@ -76,7 +156,8 @@ function Invoke-Install {
     param(
         [Parameter(Mandatory)][string]$AllowedIP,
         [Parameter(Mandatory)][string]$PublicKeyPath,
-        [int]$DaysUntilExpiry = 3
+        [int]$DaysUntilExpiry = 3,
+        [string]$LocalSourcePath
     )
 
     if ($AllowedIP -notmatch '^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$') {
@@ -90,7 +171,7 @@ function Invoke-Install {
     New-Item -ItemType Directory -Force -Path $stateDir | Out-Null
     $statePath = Join-Path $stateDir "state.json"
 
-    Enable-OpenSSHServer -StatePath $statePath
+    Enable-OpenSSHServer -StatePath $statePath -LocalSourcePath $LocalSourcePath
 
     $publicKeyContent = (Get-Content $PublicKeyPath -Raw).Trim()
     Add-EngineerKey -PublicKeyPath $PublicKeyPath `

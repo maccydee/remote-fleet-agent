@@ -3,3 +3,63 @@ __pycache__/
 .venv/
 .pytest_cache/
 *.egg-info/
+
+# Private engagement and generated data
+fleet.local.json
+*.local.json
+known_hosts
+id_ed25519
+id_rsa
+*.pem
+*.key
+*.pub
+evidence/
+jobs/
+dist/
+testResults.xml
+.ruff_cache/
+
+build/
+
+# Generated local labs: keep credentials and evidence out of version control.
+**/.state/
+/fleet-demo/
+/linux-lab/
+**/.fleet-lab.json
+
+# Default local workspace: client configs and evidence remain private.
+/fleet-workspace/
+
+# Generated MCP configuration may identify private client paths.
+/ai-setup/
+
+# Credentials, private workspaces and generated captures
+.env
+.env.*
+!.env.example
+.ssh/
+**/owner-access.json
+**/operator-token*
+**/technician-token*
+**/*credentials*.json
+**/*secrets*.json
+**/fleet.json
+**/known_hosts*
+id_ed25519*
+id_rsa*
+*.p12
+*.pfx
+*.jks
+*.kdbx
+*.sqlite
+*.sqlite3
+*.sqlite3-*
+*.db
+*.log
+/outputs/
+/work/
+/stage/
+/kits/
+/browser-results/
+/test-results/
+.DS_Store

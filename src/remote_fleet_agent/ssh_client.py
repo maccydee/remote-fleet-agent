@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import logging
+import os
 import time
 from dataclasses import dataclass
 
@@ -53,7 +54,15 @@ async def run_powershell(conn, script: str) -> CommandResult:
     )
 
 
-async def connect(host: str, key_path: str, *, timeout: float = 10.0, retries: int = 1):
+async def connect(
+    host: str,
+    key_path: str,
+    *,
+    port: int = 22,
+    timeout: float = 10.0,
+    retries: int = 1,
+    known_hosts: str | None = None,
+):
     """Open an SSH connection to host, with one retry and structured logging.
 
     (WHY: known_hosts=None — targets are freshly installed each engagement
@@ -61,6 +70,18 @@ async def connect(host: str, key_path: str, *, timeout: float = 10.0, retries: i
     engineer's physical presence at install time, not by TOFU key pinning.
     See DESIGN.md's trust/pairing section.)
     """
+    target = host
+    options = {}
+    if port != 22:
+        options["port"] = port
+    if "@" in host:
+        username, target = host.rsplit("@", 1)
+        if not username or not target:
+            raise ValueError("host must be username@hostname")
+        options["username"] = username
+    known_hosts = (
+        known_hosts or os.environ.get("REMOTE_FLEET_AGENT_KNOWN_HOSTS") or None
+    )
     attempt = 0
     last_error: Exception | None = None
     while attempt <= retries:
@@ -68,17 +89,28 @@ async def connect(host: str, key_path: str, *, timeout: float = 10.0, retries: i
         start = time.monotonic()
         try:
             conn = await asyncio.wait_for(
-                asyncssh.connect(host, client_keys=[key_path], known_hosts=None),
+                asyncssh.connect(
+                    target, client_keys=[key_path], known_hosts=known_hosts, **options
+                ),
                 timeout=timeout,
             )
-            elapsed_ms = (time.monotonic() - start) * 1000  # (MEASURED, real connect latency)
+            elapsed_ms = (
+                time.monotonic() - start
+            ) * 1000  # (MEASURED, real connect latency)
             logger.info("ssh.connect.ok host=%s elapsed_ms=%.1f", host, elapsed_ms)
             return conn
         except Exception as exc:  # noqa: BLE001 - deliberately broad: always log, then retry or raise
             last_error = exc
             if attempt <= retries:
-                logger.info("ssh.connect.retry host=%s attempt=%d error=%s", host, attempt, exc)
+                logger.info(
+                    "ssh.connect.retry host=%s attempt=%d error=%s", host, attempt, exc
+                )
             else:
-                logger.info("ssh.connect.failed host=%s attempts=%d error=%s", host, attempt, exc)
+                logger.info(
+                    "ssh.connect.failed host=%s attempts=%d error=%s",
+                    host,
+                    attempt,
+                    exc,
+                )
     assert last_error is not None
     raise last_error

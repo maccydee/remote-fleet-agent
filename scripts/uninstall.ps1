@@ -24,10 +24,16 @@ if (-not (Get-Command Remove-NetFirewallRule -ErrorAction SilentlyContinue)) {
         param([string]$Name)
     }
 }
-if (-not (Get-Command Disable-WindowsOptionalFeature -ErrorAction SilentlyContinue)) {
-    function Disable-WindowsOptionalFeature {
+if (-not (Get-Command Remove-WindowsCapability -ErrorAction SilentlyContinue)) {
+    function Remove-WindowsCapability {
         [CmdletBinding()]
-        param([switch]$Online, [string]$FeatureName, [switch]$NoRestart)
+        param([switch]$Online, [string]$Name)
+    }
+}
+if (-not (Get-Command Get-WindowsCapability -ErrorAction SilentlyContinue)) {
+    function Get-WindowsCapability {
+        [CmdletBinding()]
+        param([switch]$Online, [string]$Name)
     }
 }
 
@@ -71,8 +77,28 @@ function Invoke-Uninstall {
 
     $sshLeftRunning = $state.ssh_was_already_enabled
     if (-not $sshLeftRunning) {
-        Disable-WindowsOptionalFeature -Online -FeatureName "OpenSSH.Server" -NoRestart
-        $removed += "openssh_server"
+        # (WHY: mirrors the install-side fix (A-010/A-011) - calling
+        # Remove-WindowsCapability to re-verify a capability that may
+        # already be gone (e.g. a second uninstall attempt, or removed by
+        # something else) can hang indefinitely with zero feedback on a
+        # machine with a flaky path to Windows Update/DISM. Check first and
+        # skip entirely when it's already NotPresent. Wrapped in try/catch
+        # so a genuine removal failure doesn't block returning the receipt
+        # for the higher-value cleanup steps (key, firewall rule, scheduled
+        # task) that already succeeded by this point.)
+        Write-Output "Checking OpenSSH.Server capability..."
+        $capability = Get-WindowsCapability -Online -Name "OpenSSH.Server~~~~0.0.1.0"
+        if ($capability.State -eq "Installed") {
+            Write-Output "Removing OpenSSH.Server capability..."
+            try {
+                Remove-WindowsCapability -Online -Name "OpenSSH.Server~~~~0.0.1.0" -ErrorAction Stop
+                $removed += "openssh_server"
+            } catch {
+                Write-Output "Could not remove OpenSSH.Server capability: $($_.Exception.Message)"
+            }
+        } else {
+            Write-Output "OpenSSH.Server capability already absent - nothing to remove."
+        }
     }
 
     Remove-Item $StatePath -ErrorAction SilentlyContinue

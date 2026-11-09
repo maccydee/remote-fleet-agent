@@ -1,0 +1,11 @@
+title = "Remote Fleet secret checks"
+[extend]
+useDefault = true
+
+[[rules]]
+id = "remote-fleet-credential-value"
+description = "Quoted high-entropy credential or Remote Fleet operator token"
+regex = '''(?i)["']?(?:operator[_-]?token|access[_-]?token|refresh[_-]?token|token|api[_-]?key|password|client[_-]?secret|secret[_-]?key)["']?\s*[:=]\s*["']([A-Za-z0-9_./+=-]{24,})["']'''
+secretGroup = 1
+entropy = 3.5
+keywords = ["token", "key", "password", "secret"]

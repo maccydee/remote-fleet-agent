@@ -1,0 +1,6 @@
+include fleet.example.json
+recursive-include docs *.md
+recursive-include tests *.ps1
+recursive-include scripts *.ps1
+
+recursive-include .github *.yml

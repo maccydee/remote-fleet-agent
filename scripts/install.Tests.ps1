@@ -10,7 +10,8 @@ BeforeAll {
         'Get-Service'                   = { param($Name, $ErrorAction) }
         'Start-Service'                 = { param($Name) }
         'Set-Service'                   = { param($Name, $StartupType) }
-        'Enable-WindowsOptionalFeature'  = { param([switch]$Online, $FeatureName, [switch]$NoRestart) }
+        'Add-WindowsCapability'          = { param([switch]$Online, $Name, $Source, $ErrorAction) }
+        'Get-WindowsCapability'          = { param([switch]$Online, $Name) }
         'Get-NetFirewallRule'            = { param($Name, $ErrorAction) }
         'Remove-NetFirewallRule'         = { param($Name) }
         'New-NetFirewallRule'            = { param($Name, $DisplayName, $Direction, $Protocol, $LocalPort, $RemoteAddress, $Action) }
@@ -31,10 +32,22 @@ BeforeAll {
 
 Describe "Test-OpenSSHEnabled / Enable-OpenSSHServer" {
     It "enables OpenSSH and records false when not previously enabled" {
-        Mock Get-Service { $null } -ParameterFilter { $Name -eq "sshd" }
-        Mock Enable-WindowsOptionalFeature { } -Verifiable
+        $script:getServiceCalls = 0
+        Mock Get-Service {
+            $script:getServiceCalls++
+            if ($script:getServiceCalls -eq 1) { return $null }
+            return [PSCustomObject]@{ Status = "Running" }
+        } -ParameterFilter { $Name -eq "sshd" }
+        Mock Add-WindowsCapability { } -Verifiable
+        $script:capCheckCalls = 0
+        Mock Get-WindowsCapability {
+            $script:capCheckCalls++
+            if ($script:capCheckCalls -eq 1) { [PSCustomObject]@{ State = "NotPresent" } }
+            else { [PSCustomObject]@{ State = "Installed" } }
+        }
         Mock Start-Service { }
         Mock Set-Service { }
+        Mock Start-Sleep { }
         $statePath = Join-Path $TestDrive "state.json"
 
         Enable-OpenSSHServer -StatePath $statePath
@@ -44,16 +57,140 @@ Describe "Test-OpenSSHEnabled / Enable-OpenSSHServer" {
         $state.ssh_was_already_enabled | Should -Be $false
     }
 
+    It "skips Add-WindowsCapability entirely when the capability is already installed" {
+        # (WHY: live testing (2026-11-03) found this was the actual cause of
+        # the script appearing to hang with no feedback - it kept calling
+        # Add-WindowsCapability to re-verify a capability that was already
+        # installed, and that online re-check call could sit for a long time
+        # with nothing printed. Checking first and skipping entirely when
+        # already Installed removes that unnecessary call in the common case.)
+        $script:skipSvcCalls = 0
+        Mock Get-Service {
+            $script:skipSvcCalls++
+            if ($script:skipSvcCalls -eq 1) { return $null }
+            return [PSCustomObject]@{ Status = "Running" }
+        } -ParameterFilter { $Name -eq "sshd" }
+        Mock Get-WindowsCapability { [PSCustomObject]@{ State = "Installed" } }
+        Mock Add-WindowsCapability { }
+        Mock Start-Service { }
+        Mock Set-Service { }
+        Mock Start-Sleep { }
+        $statePath = Join-Path $TestDrive "state10.json"
+
+        Enable-OpenSSHServer -StatePath $statePath
+
+        Should -Invoke Add-WindowsCapability -Times 0
+        Should -Invoke Start-Service -Times 1
+    }
+
     It "does not re-enable when already running, records true" {
         Mock Get-Service { [PSCustomObject]@{ Status = "Running" } } -ParameterFilter { $Name -eq "sshd" }
-        Mock Enable-WindowsOptionalFeature { }
+        Mock Add-WindowsCapability { }
         $statePath = Join-Path $TestDrive "state2.json"
 
         Enable-OpenSSHServer -StatePath $statePath
 
-        Should -Invoke Enable-WindowsOptionalFeature -Times 0
+        Should -Invoke Add-WindowsCapability -Times 0
         $state = Get-Content $statePath | ConvertFrom-Json
         $state.ssh_was_already_enabled | Should -Be $true
+    }
+
+    It "retries and succeeds if the first attempt fails transiently" {
+        # (WHY: live testing against a real Windows machine (2026-11-03) hit
+        # exactly this - Add-WindowsCapability errored on attempt 1 with
+        # "Error 87: capability name not recognized", then the identical
+        # command succeeded on an immediate retry with no other change. A
+        # single attempt is not reliable; install.ps1 must recover from this
+        # automatically instead of requiring the engineer to notice and
+        # retry by hand.)
+        $script:retrySvcCalls = 0
+        Mock Get-Service {
+            $script:retrySvcCalls++
+            if ($script:retrySvcCalls -eq 1) { return $null }
+            return [PSCustomObject]@{ Status = "Running" }
+        } -ParameterFilter { $Name -eq "sshd" }
+        $script:capabilityAttempt = 0
+        Mock Add-WindowsCapability {
+            $script:capabilityAttempt++
+            if ($script:capabilityAttempt -eq 1) { throw "Error 87: capability name not recognized" }
+        }
+        Mock Get-WindowsCapability {
+            if ($script:capabilityAttempt -lt 2) { [PSCustomObject]@{ State = "NotPresent" } }
+            else { [PSCustomObject]@{ State = "Installed" } }
+        }
+        Mock Start-Service { }
+        Mock Set-Service { }
+        Mock Start-Sleep { }
+        $statePath = Join-Path $TestDrive "state7.json"
+
+        Enable-OpenSSHServer -StatePath $statePath -MaxAttempts 3 -RetryDelaySeconds 0
+
+        Should -Invoke Add-WindowsCapability -Times 2
+        $state = Get-Content $statePath | ConvertFrom-Json
+        $state.ssh_was_already_enabled | Should -Be $false
+    }
+
+    It "passes -LocalSourcePath through to Add-WindowsCapability when given" {
+        $script:localSrcSvcCalls = 0
+        Mock Get-Service {
+            $script:localSrcSvcCalls++
+            if ($script:localSrcSvcCalls -eq 1) { return $null }
+            return [PSCustomObject]@{ Status = "Running" }
+        } -ParameterFilter { $Name -eq "sshd" }
+        Mock Add-WindowsCapability { } -Verifiable -ParameterFilter { $Source -eq "D:\sxs" }
+        $script:localSrcCapCalls = 0
+        Mock Get-WindowsCapability {
+            $script:localSrcCapCalls++
+            if ($script:localSrcCapCalls -eq 1) { [PSCustomObject]@{ State = "NotPresent" } }
+            else { [PSCustomObject]@{ State = "Installed" } }
+        }
+        Mock Start-Service { }
+        Mock Set-Service { }
+        Mock Start-Sleep { }
+        $statePath = Join-Path $TestDrive "state8.json"
+
+        Enable-OpenSSHServer -StatePath $statePath -LocalSourcePath "D:\sxs"
+
+        Should -InvokeVerifiable
+    }
+
+    It "throws if sshd starts but is not Running shortly afterwards" {
+        # (WHY: a service can report started and then exit immediately, e.g.
+        # host-key generation failing - Start-Service succeeding is not
+        # proof the service is actually up.)
+        $script:crashSvcCalls = 0
+        Mock Get-Service {
+            $script:crashSvcCalls++
+            if ($script:crashSvcCalls -eq 1) { return $null }
+            return [PSCustomObject]@{ Status = "Stopped" }
+        } -ParameterFilter { $Name -eq "sshd" }
+        Mock Add-WindowsCapability { }
+        Mock Get-WindowsCapability { [PSCustomObject]@{ State = "Installed" } }
+        Mock Start-Service { }
+        Mock Set-Service { }
+        Mock Start-Sleep { }
+        $statePath = Join-Path $TestDrive "state9.json"
+
+        { Enable-OpenSSHServer -StatePath $statePath } | Should -Throw "*not Running*"
+    }
+
+    It "throws if the capability never reports Installed after all retry attempts" {
+        # (WHY: Add-WindowsCapability can return without throwing even when
+        # it didn't actually install anything, e.g. no reachable Windows
+        # Update/WSUS source for the payload - this is the real-world bug
+        # that made install.ps1 silently report success on a machine with
+        # a blocked FOD source. Verify-then-throw catches it instead.)
+        Mock Get-Service { $null } -ParameterFilter { $Name -eq "sshd" }
+        Mock Add-WindowsCapability { }
+        Mock Get-WindowsCapability { [PSCustomObject]@{ State = "NotPresent" } }
+        Mock Start-Service { }
+        Mock Set-Service { }
+        Mock Start-Sleep { }
+        $statePath = Join-Path $TestDrive "state6.json"
+
+        { Enable-OpenSSHServer -StatePath $statePath -MaxAttempts 2 -RetryDelaySeconds 0 } | Should -Throw "*did not install*"
+        Should -Invoke Add-WindowsCapability -Times 2
+        Should -Invoke Start-Service -Times 0
     }
 }
 
