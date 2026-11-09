@@ -236,9 +236,7 @@ function Invoke-AssessmentInstall {
     $authPath=Join-Path $env:ProgramData 'ssh\administrators_authorized_keys'
     $sshDir=Split-Path $authPath
     foreach ($path in @($sshDir,$authPath)) {
-        if ((Test-Path -LiteralPath $path) -and ((Get-Item -LiteralPath $path -Force).Attributes -band [IO.FileAttributes]::ReparsePoint)) {
-            throw "Refusing a reparse point at $path"
-        }
+        Assert-FleetStoragePath -Path $path
     }
     $keyWasPresent=$false
     $originalAcl=$null
@@ -312,7 +310,9 @@ function Invoke-AssessmentInstall {
         # Reconcile again in case adding the feature created another allow rule.
         Set-FleetFirewall -EngineerIP $EngineerIP -AllowRule $ruleName -BlockRule $blockRuleName
         $global:FleetStage='key_permissions'
-        $null=New-Item -ItemType Directory -Force -Path $sshDir
+        if(-not (Test-Path -LiteralPath $sshDir)){New-FleetStorageDirectory -Path $sshDir}
+        Assert-FleetStoragePath -Path $sshDir
+        Assert-FleetStoragePath -Path $authPath
         if (-not (Test-Path -LiteralPath $authPath) -or @((Get-Content -LiteralPath $authPath -ErrorAction SilentlyContinue)) -notcontains $key) {
             $existing=if(Test-Path -LiteralPath $authPath){[IO.File]::ReadAllText($authPath)}else{''}
             if ($existing -and -not $existing.EndsWith("`n")) { $existing+="`r`n" }
