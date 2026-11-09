@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import csv
 import ctypes
+import errno
 import io
 import os
 import platform
@@ -65,7 +66,13 @@ def restrict_private(path, *, directory=False):
     if platform.system() == "Windows":
         _windows_restrict(path, directory)
     else:
+        if platform.system() == "Darwin":
+            _macos_acl(path, clear=True)
         path.chmod(0o700 if directory else 0o600)
+        if path.stat().st_mode & 0o077:
+            raise PermissionError(
+                f"Filesystem did not enforce private permissions: {path}"
+            )
 
 
 def validate_private_location(path):
@@ -107,6 +114,73 @@ def validate_private_location(path):
         # Sticky parents (e.g. /tmp) protect an owned child's directory entry.
         if item != path and info.st_mode & 0o022 and not info.st_mode & stat.S_ISVTX:
             raise PermissionError(f"Private storage parent allows replacement: {item}")
+        if item != path and platform.system() == "Darwin" and _macos_acl(item):
+            raise PermissionError(
+                f"Private storage parent ACL allows replacement: {item}"
+            )
+
+
+def _macos_acl(path, *, clear=False):
+    """Remove extended grants on owned storage; reject writable parent ACLs.
+
+    macOS extended ACLs can grant access despite mode 0700/0600. Parent
+    permissions are inspected conservatively, without changing parent ACLs.
+    """
+    libc = ctypes.CDLL(None, use_errno=True)
+    pointer = ctypes.c_void_p
+    libc.acl_init.argtypes, libc.acl_init.restype = [ctypes.c_int], pointer
+    libc.acl_get_file.argtypes, libc.acl_get_file.restype = (
+        [ctypes.c_char_p, ctypes.c_int],
+        pointer,
+    )
+    libc.acl_set_file.argtypes, libc.acl_set_file.restype = (
+        [ctypes.c_char_p, ctypes.c_int, pointer],
+        ctypes.c_int,
+    )
+    libc.acl_free.argtypes, libc.acl_free.restype = [pointer], ctypes.c_int
+    libc.acl_get_entry.argtypes, libc.acl_get_entry.restype = (
+        [pointer, ctypes.c_int, ctypes.POINTER(pointer)],
+        ctypes.c_int,
+    )
+    libc.acl_get_tag_type.argtypes, libc.acl_get_tag_type.restype = (
+        [pointer, ctypes.POINTER(ctypes.c_int)],
+        ctypes.c_int,
+    )
+    libc.acl_get_permset_mask_np.argtypes, libc.acl_get_permset_mask_np.restype = (
+        [pointer, ctypes.POINTER(ctypes.c_uint64)],
+        ctypes.c_int,
+    )
+    acl = libc.acl_init(0) if clear else libc.acl_get_file(os.fsencode(path), 0x100)
+    if not acl:
+        if not clear and ctypes.get_errno() == errno.ENOENT and Path(path).exists():
+            return False  # Darwin reports ENOENT when an existing object has no ACL.
+        raise OSError(
+            ctypes.get_errno(), "Could not inspect private storage ACL", str(path)
+        )
+    try:
+        if clear:
+            if libc.acl_set_file(os.fsencode(path), 0x100, acl):
+                raise OSError(
+                    ctypes.get_errno(),
+                    "Could not remove extended storage grants",
+                    str(path),
+                )
+            return False
+        entry, tag, mask = pointer(), ctypes.c_int(), ctypes.c_uint64()
+        index = 0
+        while libc.acl_get_entry(acl, index, ctypes.byref(entry)) == 0:
+            index = -1
+            if libc.acl_get_tag_type(
+                entry, ctypes.byref(tag)
+            ) or libc.acl_get_permset_mask_np(entry, ctypes.byref(mask)):
+                raise OSError(
+                    ctypes.get_errno(), "Could not inspect parent ACL entry", str(path)
+                )
+            if tag.value == 1 and mask.value & 0x3050:
+                return True  # delete, delete-child, write-security or change-owner
+        return False
+    finally:
+        libc.acl_free(acl)
 
 
 def _windows_security(path):

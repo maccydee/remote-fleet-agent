@@ -2,7 +2,9 @@
 
 import json
 import os
+import platform
 import stat
+import subprocess
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime, timedelta
@@ -19,6 +21,29 @@ from tests.test_support_mcp import request
 from tests.test_support_mcp import workspace as _workspace
 
 workspace = _workspace
+
+
+@pytest.mark.skipif(
+    platform.system() != "Darwin", reason="Native macOS extended ACL semantics"
+)
+def test_native_macos_extended_grants_are_removed_and_parent_grants_rejected(tmp_path):
+    folder = tmp_path / "private-acl"
+    folder.mkdir()
+    subprocess.run(
+        ["/bin/chmod", "+a", "everyone allow read,write,delete", str(folder)],
+        check=True,
+    )
+    assert host_platform._macos_acl(folder)
+    private_dir(folder)
+    assert not host_platform._macos_acl(folder)
+    subprocess.run(
+        ["/bin/chmod", "+a", "everyone allow delete_child", str(folder)], check=True
+    )
+    try:
+        with pytest.raises(PermissionError, match="parent ACL"):
+            private_dir(folder / "child")
+    finally:
+        subprocess.run(["/bin/chmod", "-N", str(folder)], check=True)
 
 
 def target(**values):

@@ -24,7 +24,8 @@ jobs:
       - name: Static checks
         run: python -m ruff check src tests/test_integration_compatibility.py
       - name: Tests including native process, private storage and stdio MCP
-        run: python -m pytest -q -p no:cacheprovider --ignore=tests/browser
+        timeout-minutes: 6
+        run: python -m pytest -vv -p no:cacheprovider -o faulthandler_timeout=120 --durations=10 --ignore=tests/browser
       - name: Windows cleanup ownership and permission guards
         if: runner.os == 'Windows' && matrix.python == '3.13'
         shell: pwsh
