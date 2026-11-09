@@ -27,3 +27,7 @@ Implementation: 382 source tests passed, 11 skipped; 26 browser tests passed. Th
 Windows read-only SSH preflight and real two-device Linux collection passed. Native scratch/recovery/canary/outage cycles remain NOT_RUN pending current enrollment and separate human decisions; Mac SSH is unavailable. Windows controller tests and interactive provider sessions remain NOT_RUN. Do not advertise a validated 3×3 controller/target matrix or completed Outlook/driver repair.
 
 Ten fictional screenshots and a 23.72-second browser recording were captured and inspected. They remain private pending publication review. No provider/native recording is represented by this set. The private task workspace contains outputs/operations-release/verification.json with exact wheel hash, logs, versions and limitations.
+
+## First GitHub controller matrix — 2026-11-09
+
+The native Windows controller jobs have now run on Python 3.11 and 3.13. Both reported 13 failures, 370 passes and 10 skips. Findings include Windows text encoding, POSIX-only local probe/scratch fixtures, and the ACL inspection test. This supersedes the earlier Windows-controller NOT_RUN entry; it does not establish passing Windows controller support. The original failure evidence is retained in [CI run 42545630844](https://github.com/maccydee/remote-fleet-agent/actions/runs/42545630844). The separate full-history secret scan passed.

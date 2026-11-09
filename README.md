@@ -1,141 +1,203 @@
-# Remote Fleet Agent
+<div align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/brand/remote-fleet-logo-reversed.svg">
+    <img src="docs/brand/remote-fleet-logo-primary.svg" alt="Remote Fleet" width="340">
+  </picture>
 
-<img src="docs/brand/remote-fleet-logo-primary.svg" alt="Remote Fleet" width="300">
+# Remote Fleet
 
-A laptop-side MCP toolkit for collecting Windows, macOS and Linux inventory and diagnostic evidence over approved OpenSSH access. Endpoint operations are read-only by default. Version 0.9 adds AI-assisted support cases: investigate, propose an exact repair, get separate engineer approval, execute and verify. The support workflow can run approved PowerShell or POSIX shell scripts; real administration is disabled until the engagement explicitly enables it. The separate legacy maintenance interface retains its three fixed actions. See [AI-assisted support](docs/AI-SUPPORT.md).
+**AI-assisted IT support. Engineer-approved changes.**
 
-Version 0.6 adds explicit platform selection, a fictional seven-device demo and a disposable Linux Docker lab. macOS/Linux collection requires Python 3 and existing approved SSH access; Windows maintenance stays Windows-only.
+<p>An MCP server and local operations workspace for investigating and administering<br>
+Windows, macOS and Linux devices over SSH.</p>
 
-Version 0.5 added an offline fleet dashboard, evidence reports, readiness probes, canary-gated maintenance batches, shareable summaries with reviewed retention, and revisioned manual evidence tracking. The packaged assessment installer and existing maintenance controls remain available. A job can finish with partial evidence; unknown results are never compliance passes.
+<p>
+  <a href="https://github.com/maccydee/remote-fleet-agent/actions/workflows/compatibility.yml"><img src="https://github.com/maccydee/remote-fleet-agent/actions/workflows/compatibility.yml/badge.svg" alt="Host and MCP compatibility"></a>
+  <a href="https://github.com/maccydee/remote-fleet-agent/actions/workflows/secret-check.yml"><img src="https://github.com/maccydee/remote-fleet-agent/actions/workflows/secret-check.yml/badge.svg" alt="Secret checks"></a>
+  <img src="https://img.shields.io/badge/Python-3.11%2B-7156D9?style=flat-square" alt="Python 3.11 or newer">
+  <img src="https://img.shields.io/badge/MCP-stdio-7156D9?style=flat-square" alt="MCP stdio">
+</p>
 
-## Try the simulated fleet
+[Quick start](#quick-start) · [AI integrations](#connect-your-ai-client) · [How it works](#how-it-works) · [Documentation](#documentation)
 
-```sh
-remote-fleet-agent demo --directory ./fleet-demo
+</div>
+
+Describe the problem in Claude, Codex or another connected AI client. Use Remote Fleet to inspect the enrolled device, review the proposed repair, approve the exact changes and keep the result in a shared support history.
+
+Built for **IT support engineers, managed service providers (MSPs) and internal IT teams** working across multiple clients and sites. Conversations stay in your AI client; the workspace brings attention, approvals and outcomes together.
+
+![Remote Fleet Operations workspace showing a filtered IT support queue across fictional clients, with pending approvals and simulated devices](docs/images/operations.png)
+
+<p align="center"><sub>Actual Operations UI. Fictional clients and simulated devices; no real endpoint commands were run in these screenshots.</sub></p>
+
+> **Development preview · 0.9** — The administration workflow is implemented and covered by automated tests. Native repair validation is still in progress. See [validation status](#validation-status) before using it with real devices.
+
+## What you can do
+
+| | Capability | What it gives the engineer |
+| :---: | --- | --- |
+| ◉ | **Fleet oversight** | Find work across permitted clients, sites and devices. Filter by platform, engineer or state. |
+| ⌕ | **AI-assisted investigation** | Confirm named targets, run bounded PowerShell or shell diagnostics, and retain the output. |
+| ✓ | **Human-approved repairs** | Review exact scripts, devices, impact and execution windows before changes are queued. |
+| ⤴ | **Controlled rollouts** | Start with a trial device, pause for readiness and stop on a failed or uncertain trial. |
+| ↺ | **Recovery and history** | Use approved conditional recovery steps and inspect uncertain results without automatic replay. |
+| ▦ | **Inventory and evidence** | Collect inventory, diagnostics and readiness; compare snapshots and prepare client handovers. |
+
+Device pages bring **Summary, Support history, Inventory, Evidence and Access** into one place. Existing evidence tools also cover manual appliance records, follow-ups, collection schedules and reports.
+
+## How it works
+
+```mermaid
+flowchart LR
+    Engineer[IT engineer] --> AI[Claude / Codex / MCP client]
+    AI <-->|MCP stdio| Controller[Remote Fleet controller]
+    Engineer --> Workspace[Browser workspace]
+    Workspace <-->|Review and approval| Controller
+    Controller <-->|Verified SSH| Devices[Windows / macOS / Linux]
 ```
 
-Open `fleet-demo/dashboard.html`. It contains seven fictional Windows, Mac and Linux devices, including limited permissions and an offline host. The simulator opens no SSH connections and needs no Docker engine or private key. Its jobs are kept in a separate `simulation` subdirectory, even when a client name matches a real engagement.
+1. **Select the device.** The engineer confirms the enrolled target, platform and account for an investigation.
+2. **Investigate.** The AI gathers evidence and explains what it found, including uncertainty.
+3. **Review the repair.** The plan names the devices, exact commands, checks, impact and timing. An authorised human approves that revision in the workspace.
+4. **Execute and verify.** Remote Fleet records progress and technical checks. Confirmation that the affected user's problem is resolved stays separate.
 
-For two real Linux containers, see [the cross-platform and lab guide](docs/CROSS-PLATFORM-LAB.md). Docker containers run Linux; macOS and Windows examples in the demo use fictional responses. Container evidence cannot establish a physical machine's firewall, disk encryption or service-manager behavior.
+A typical request might be:
 
-## Dashboard, reporting and manual evidence
+> Investigate why printing is stuck on office-01. Show me the evidence and proposed changes, give me the review link, and wait for my approval before applying the repair.
+
+This is an example support request. The project does not ship a guaranteed Outlook or printer-driver repair catalogue.
+
+<details>
+<summary><strong>See the repair review screen</strong></summary>
+
+![Remote Fleet repair review showing the diagnosis, disruption, exact device and expandable script for a simulated printer support case](docs/images/repair-review.png)
+
+The screenshot shows a simulated case awaiting approval. It does not demonstrate a native printer repair.
+
+</details>
+
+## Quick start
+
+Try the fictional fleet first. **No endpoint credentials or Docker required.** You need Git and Python **3.11 or newer**; install from source using the commands for your computer.
+
+<details open>
+<summary><strong>macOS / Linux</strong></summary>
 
 ```sh
-remote-fleet-agent workspace dashboard --config fleet.local.json --private --output ./dashboard.html
-remote-fleet-agent workspace report --config fleet.local.json --output ./shareable-report.html
-```
-
-Dashboards and reports use saved evidence without contacting a Windows host. Open the self-contained HTML in a browser; regenerate it after collection or manual imports. Reports are shareable summaries by default. Private exports include identities, raw evidence, notes and references. Manual appliance/cloud evidence can be entered before SSH setup, tracked by revision and imported from dashboard downloads.
-
-[The operations workflow guide](docs/OPERATIONS-WORKFLOW.md) covers all six additions, exact commands, privacy boundaries, retention and batch recovery.
-
-## What you can collect
-
-Windows inventory has 12 selectable sections: operating system, hardware, machine-wide software registrations, disks, encryption status, network configuration, local users, administrators, firewall profiles, Defender, registered antivirus products and installed hotfixes.
-
-Windows diagnostics has six sections: performance, stopped automatic services, recent System error metadata, selected reboot indicators, DNS configuration and storage. Event messages, document contents, passwords, hashes and recovery keys aren't collected. No external network probe is made.
-
-Collections are bounded and return per-section status, counts and truncation markers. Some commands depend on Windows edition, modules and privileges. See [the workflow guide](docs/FLEET-WORKFLOW.md) for coverage limits.
-
-## Setup
-
-```sh
+git clone https://github.com/maccydee/remote-fleet-agent.git
+cd remote-fleet-agent
 python3 -m venv .venv
-.venv/bin/pip install -e '.[dev]'
+.venv/bin/python -m pip install -e .
+
+.venv/bin/remote-fleet-agent workspace-app init --directory ./fleet-workspace
+.venv/bin/remote-fleet-agent workspace-app serve --directory ./fleet-workspace --open
 ```
 
-Use authorised Windows hosts with OpenSSH already configured. Verify each host's SSH fingerprint at its console, and save the verified public host keys in a known-hosts file. Keep the engagement private key on the engineer's laptop.
+</details>
 
-Copy `fleet.example.json` to `fleet.local.json`, enter the verified host-key file and explicitly approved Windows usernames/addresses, and assign groups. Relative `known_hosts` paths resolve against the configuration file, not the current directory.
+<details>
+<summary><strong>Windows PowerShell</strong></summary>
 
-## Run a fleet job from the terminal
+```powershell
+git clone https://github.com/maccydee/remote-fleet-agent.git
+cd remote-fleet-agent
+py -3 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -e .
+
+.\.venv\Scripts\remote-fleet-agent.exe workspace-app init --directory .\fleet-workspace
+.\.venv\Scripts\remote-fleet-agent.exe workspace-app serve --directory .\fleet-workspace --open
+```
+
+</details>
+
+The app opens locally at **http://127.0.0.1:8877**, with two fictional clients and simulated Windows, macOS and Linux devices. `--open` signs in using the private bootstrap owner token. The controller must stay running while you use the workspace.
+
+Already have a workspace? Skip `init` and serve the existing directory. Initialization requires an empty directory.
+
+For two actual disposable Linux SSH devices, follow the [Docker lab guide](docs/CROSS-PLATFORM-LAB.md). Those containers run Linux; the Windows and macOS simulator entries remain fictional.
+
+## Connect your AI client
+
+Remote Fleet uses **Model Context Protocol (MCP) over stdio**. Generated configuration formats cover:
+
+**Claude Code · Claude Desktop · Codex · Gemini CLI · Cursor · VS Code · generic MCP clients**
+
+The AI client handles its own model credentials. Remote Fleet needs no separate OpenAI, Anthropic or Google API key.
+
+In **Settings → Operators**, create a dedicated **technician** operator for the AI and limit its clients and sites. Save its token in a private file outside the repository. Keep your owner or manager token for human decisions; the AI bridge refuses those approval roles.
+
+With the workspace running, launch the support bridge using your environment's Python:
 
 ```sh
-.venv/bin/remote-fleet-agent run-fleet \
-  --config fleet.local.json --key-path /secure/engagement/id_ed25519 \
-  --operation inventory --group office
+.venv/bin/python -m remote_fleet_agent.support_mcp \
+  --workspace-url http://127.0.0.1:8877 \
+  --operator-token-file /private/path/ai-technician-token.txt
 ```
 
-Use `--hosts office-01 office-02` instead of a group for an explicit selection. Add `--sections os disks software` for a smaller inventory. Choose `--operation diagnostics` for diagnostics or `--operation readiness` for read-only access, module, disk-space and cleanup-expiry checks. The command waits for completion and prints the job ID, progress summary and saved evidence path. Exit 0 means collection completed; exit 2 means some hosts or sections were unsuccessful. Neither is a security certification result.
+On Windows, use `.\.venv\Scripts\python.exe` in place of `.venv/bin/python`.
 
-Jobs are stored under `~/.remote-fleet-agent/jobs/<client>/` by default. Override the root with `--job-dir`. Retry unsuccessful hosts using the original configuration, key and job root:
+Add `--write-configs ./support-ai-setup` to generate client snippets in an empty directory. Review and merge the relevant entry into your AI client, then reconnect it. Generation leaves existing client settings untouched.
+
+Use the [AI support guide](docs/AI-SUPPORT.md) for setup and the [administration guide](docs/OPERATIONS-ADMINISTRATION.md) for confirmed investigations, executable plans and recovery. Provider configuration support and SDK tests are verified separately from interactive client testing.
+
+## Working with real devices
+
+Enrol explicitly authorised devices with verified SSH host keys. Keep the engagement's private key on the controller and define the approved accounts, hosts and access policy. Custom administration requires a separate engagement opt-in.
+
+| Boundary | Current behaviour |
+| --- | --- |
+| **Target scope** | Only enrolled, approved devices; no automatic network discovery. |
+| **Investigation** | Named-target confirmation, bounded output and timeouts. Custom scripts retain account privileges and can change state. |
+| **Repair approval** | A separate human approves the exact plan revision in the workspace. The AI cannot approve its own proposal. |
+| **Interrupted work** | Unknown outcomes are retained and blocked from automatic replay. |
+| **Cancellation** | Prevents further dispatch; it cannot undo a command already sent. |
+| **Recovery** | Runs only the recovery steps and conditions in the approved plan. |
+| **Hosting** | Local loopback controller; self-hosted access uses verified SSH forwarding and application login. |
+
+Start with [deployment and enrollment](docs/DEPLOYMENT.md), [scope and access policy](docs/LIVE-WORKSPACE.md), and [credential handling](SECURITY.md). Keep operator tokens, SSH private keys, live configurations and customer evidence out of Git. The repository includes ignore rules, a local secret-check script and a full-history CI scan.
+
+## Validation status
+
+The **8 November 2026** build was checked with:
+
+| Evidence | Result |
+| --- | --- |
+| Python regression suite | **382 passed**, 11 skipped |
+| Chromium browser suite | **26 passed** |
+| Installed macOS controller package | **83 passed** |
+| Installed Linux controller package, isolated container | **83 passed** |
+| Windows endpoint and two Linux Docker endpoints | Pinned SSH read-only checks completed |
+| New native repair/recovery cycles | Not completed across the target platforms |
+| Native macOS target | SSH prerequisite unavailable in the test environment |
+| Windows controller CI, 9 November | Initial native run exposed compatibility failures; fixes pending |
+| Interactive AI-client workflows | Not yet verified in each provider application |
+
+The [first Windows controller CI run](https://github.com/maccydee/remote-fleet-agent/actions/runs/42545630844) exposed encoding, platform-specific fixture and ACL-check failures. Windows controller support remains under validation. The badges at the top show the current CI results. Unit tests, simulations, real SSH collection and native repairs establish different things. See [release evidence and remaining gates](docs/SUPPORT-RELEASE-GATES.md) for the limits; a container test does not establish native GUI, systemd or physical-device behaviour.
+
+## Documentation
+
+| Guide | Start here for |
+| --- | --- |
+| [Operations and administration](docs/OPERATIONS-ADMINISTRATION.md) | Confirmed investigations, repair plans, rollout controls and recovery |
+| [Local workspace](docs/LIVE-WORKSPACE.md) | Clients, sites, roles, operator tokens and scheduling |
+| [AI support](docs/AI-SUPPORT.md) | Connecting an AI client and reviewing support cases |
+| [AI and host compatibility](docs/AI-AND-HOST-COMPATIBILITY.md) | Provider formats and Windows, macOS and Linux controllers |
+| [Deployment](docs/DEPLOYMENT.md) | Windows assessment kit, enrollment and cleanup |
+| [Cross-platform lab](docs/CROSS-PLATFORM-LAB.md) | Simulated devices and two disposable Linux SSH endpoints |
+| [Fleet collection](docs/FLEET-WORKFLOW.md) | Inventory, diagnostics, readiness and terminal jobs |
+| [Evidence and reporting](docs/OPERATIONS-WORKFLOW.md) | Comparisons, manual records, reports and retention |
+| [Credential handling](SECURITY.md) | Keeping secrets and customer data out of source control |
+
+## Development
 
 ```sh
-.venv/bin/remote-fleet-agent run-fleet \
-  --config fleet.local.json --key-path /secure/engagement/id_ed25519 \
-  --retry-job JOB_ID
+.venv/bin/python -m pip install -e '.[dev,browser]'
+.venv/bin/python -m pytest -q --ignore=tests/browser
+.venv/bin/python -m playwright install chromium
+.venv/bin/python -m pytest tests/browser -q
+.venv/bin/python -m ruff check src tests
 ```
 
-## Connect an MCP client
+On Windows, use `.\.venv\Scripts\python.exe` in place of `.venv/bin/python`. Native tests require an explicit opt-in, private manifest and separate human approval; see [native support testing](docs/NATIVE-SUPPORT-TESTING.md). Review staged changes with `sh scripts/check-secrets.sh` before committing; it requires Gitleaks.
 
-Launch the stdio server with these environment variables set:
-
-```sh
-REMOTE_FLEET_AGENT_KEY_PATH=/secure/engagement/id_ed25519 \
-REMOTE_FLEET_AGENT_CONFIG=/absolute/path/fleet.local.json \
-  .venv/bin/python3 -m remote_fleet_agent.server
-```
-
-Optional `REMOTE_FLEET_AGENT_JOB_DIR` selects the job root. The server offers:
-
-- `describe_capabilities`, `list_hosts`
-- `inventory`, `diagnostics`, `readiness`, `run_check`, `fit_check`
-- `start_job`, `get_job`, `get_host_result`, `list_jobs`
-- `retry_job`, `cancel_job`, `compare_inventory`
-- `fleet_status`, `export_evidence`
-- `list_manual_evidence`, `add_manual_evidence`, `update_manual_evidence`
-- `preview_retention`, `apply_retention`
-
-`start_job` returns quickly so you can inspect progress while collection continues. Keep the server running. Terminal users should use `run-fleet`, which waits for their job to finish. A stopped server doesn't keep working in the background; interrupted work can be retried explicitly.
-
-## Controlled maintenance
-
-Keep `maintenance_actions` empty for audit work. To enable maintenance, list only the permitted action IDs in the engagement configuration: `start_print_spooler`, `start_time_service`, `clear_dns_cache`. Those actions become available for all approved hosts in that configuration. Keep narrower maintenance engagements if different hosts need different permissions.
-
-Enabled fleet MCP servers additionally offer `preview_maintenance`, `get_maintenance`, `preview_batch`, `get_batch` and `cancel_batch`. These interfaces cannot execute endpoint changes. AI repairs use the workspace support MCP: the engineer reviews the exact devices and scripts, records approval in the workspace, then the AI requests execution. A plan digest binds content and never substitutes for human approval. Engineer-operated fixed maintenance remains available through the CLI. No maintenance actions run through fleet inventory jobs.
-
-The CLI provides the same flow. See [the maintenance guide](docs/MAINTENANCE.md) for commands, uncertain outcomes and rollback limits. `REMOTE_FLEET_AGENT_AUDIT_ONLY=1` suppresses maintenance even when configured, in both the server and CLI.
-
-## Scope and permissions
-
-Every SSH operation resolves through the configured approved host list and uses the verified known-hosts file. The server doesn't scan the network or approve new targets. Select one configured group or a nonempty explicit host list for each job. Read-only queries need no repeated per-host confirmation after that selection.
-
-The Windows SSH account still has its normal account privileges, typically administrator privileges for these queries. The application tool boundary doesn't turn that SSH key into a technically restricted read-only credential.
-
-Configuration and evidence belong in private storage. Evidence may contain usernames, device addresses and application information. Keep real keys, deployment kits, evidence and client configurations out of public repositories.
-
-## Stage the assessment installer
-
-```sh
-remote-fleet-agent init-client example --stage-dir ./example-kit --allowed-ip 192.0.2.10
-```
-
-This creates a private per-engagement key on the engineer laptop and stages the public key, bundled `Install-Assessment.ps1` / `Remove-Assessment.ps1`, matching TXT copies and a copyable installation command. The command runs from the kit directory in elevated Windows PowerShell. Replace the example address with the engineer laptop's actual IPv4 address. `--force` reuses an existing keypair and restages the kit; it never replaces that key.
-
-The installer preserves the original state across repairs, scopes TCP/22 to the engineer address, verifies effective firewall coverage, and registers protected local SYSTEM cleanup before enabling access. The default expiry is three days with hourly retry opportunities for seven days. See [deployment and recovery](docs/DEPLOYMENT.md) for the lifecycle, validation evidence and remaining limits.
-
-The earlier `scripts/install.ps1` and `scripts/uninstall.ps1` remain historical prototypes for comparison and tests. The CLI no longer stages them.
-
-## Legacy modules
-
-The file-triage and personal-data scanner modules remain in the codebase for future development and tests, but the MCP server doesn't register them. The audit-only environment switch suppresses the new maintenance tools; it cannot expose those legacy modules.
-
-## Validation
-
-```sh
-.venv/bin/python3 -m pytest -q
-```
-
-Inventory has been tested live on one Windows PC. The Python suite covers inventory, maintenance, key staging, shared fleet concurrency and controller-crash recovery; PowerShell tests cover maintenance scripts and installer helpers. A live MCP test on the approved Windows test PC completed DNS cache clearing, verified an already-running service as a no-op, rejected execution replay and ineligible rollback, and restored the read-only tool surface. On 8 November 2026, a separate live MCP test started Windows Time, verified Running/Manual, then used guarded rollback to restore Stopped/Manual. An independent endpoint read confirmed the original service states, and replay and duplicate rollback were rejected. Further live tests on the same PC verified Print Spooler start/rollback with an empty queue, restored its original Running/Automatic state, installed and repaired the packaged assessment kit, authenticated a separate temporary key, ran SYSTEM scheduled cleanup, rejected the removed key, and restored the baseline. A reboot test confirmed SSH autostart, pinned-key reconnection and preservation of the original cleanup task. A 30-host simulated workload and real controller-process crash were also tested. These results do not establish fresh OpenSSH feature installation/removal, other Windows editions/policies or a real 30-machine rollout. No public release or licence selection is implied by this development milestone.
-
-The version 0.5 workflow additions were validated offline using saved evidence, simulated hosts, local PowerShell syntax checks, MCP protocol tests and browser interaction. No new Windows tests were performed. The dashboard is a snapshot and no compliance score is generated.
-
-
-## Live local workspace
-
-Version 0.7 adds an authenticated local app with client/site navigation, device pages, reviewed collections, manual evidence edits, follow-ups, inventory baselines and comparisons, saved views, freshness, optional recurring collections and branded handover reports. Start with `remote-fleet-agent workspace-app init --directory ./fleet-workspace`, then `remote-fleet-agent workspace-app serve --directory ./fleet-workspace --open`. The initial clients are simulated. See [the workspace guide](docs/LIVE-WORKSPACE.md) for access policies, roles and limitations.
-
-
-## AI clients and host operating systems
-
-Version 0.8 adds provider-neutral MCP setup for Codex, Claude Code/Desktop, Gemini CLI, Cursor, VS Code and other stdio MCP clients. The engineer host may be macOS, Windows or Linux independently of the endpoint OS. `remote-fleet-agent ai-config` generates reviewable client snippets with native absolute paths; `remote-fleet-agent doctor --config ./fleet-workspace/northstar-demo/fleet.json --probe` validates the protocol with simulated devices. See [AI and host compatibility](docs/AI-AND-HOST-COMPATIBILITY.md) for setup commands and verification limits. Native Windows/Linux CI and interactive client runs are tracked separately from configuration/schema tests.
+**Licence:** not yet specified.
