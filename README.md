@@ -18,7 +18,7 @@ Windows, macOS and Linux devices over SSH.</p>
   <img src="https://img.shields.io/badge/MCP-stdio-7156D9?style=flat-square" alt="MCP stdio">
 </p>
 
-[Quick start](#quick-start) · [AI integrations](#connect-your-ai-client) · [How it works](#how-it-works) · [Documentation](#documentation)
+[Film](#watch-remote-fleet) · [Quick start](#quick-start) · [AI integrations](#connect-your-ai-client) · [How it works](#how-it-works) · [Documentation](#documentation)
 
 </div>
 
@@ -26,9 +26,24 @@ Describe the problem in Claude, Codex or another connected AI client. Use Remote
 
 Built for **IT support engineers, managed service providers (MSPs) and internal IT teams** working across multiple clients and sites. Conversations stay in your AI client; the workspace brings attention, approvals and outcomes together.
 
+## Watch Remote Fleet
+
+[![Watch the Remote Fleet v5 showcase: a recorded Claude Code session proposing a cross-platform repair plan](docs/media/showcase-v5-poster.jpg)](https://github.com/maccydee/remote-fleet-agent/releases/tag/showcase-v5)
+
+**2:33 · Recorded Claude Code session · Remote Fleet 0.9**
+
+[Full HD film](https://github.com/maccydee/remote-fleet-agent/releases/download/showcase-v5/remote-fleet-showcase.mp4) · [Smaller 720p preview](https://github.com/maccydee/remote-fleet-agent/releases/download/showcase-v5/remote-fleet-showcase-720p-preview.mp4) · [Captions and downloads](https://github.com/maccydee/remote-fleet-agent/releases/tag/showcase-v5)
+
+Follow an investigation, engineer approval and a trial-first rollout across a fictional fleet. The conversation is recorded; devices and repairs are simulated. Tool calls are condensed, with simulation labels retained. [Film details and credits](docs/media/README.md).
+
+<details>
+<summary><strong>See the Operations workspace</strong></summary>
+
 ![Remote Fleet Operations workspace showing a filtered IT support queue across fictional clients, with pending approvals and simulated devices](docs/images/operations.png)
 
 <p align="center"><sub>Actual Operations UI. Fictional clients and simulated devices; no real endpoint commands were run in these screenshots.</sub></p>
+
+</details>
 
 > **Development preview · 0.9** — The administration workflow is implemented and covered by automated tests. Native repair validation is still in progress. See [validation status](#validation-status) before using it with real devices.
 
