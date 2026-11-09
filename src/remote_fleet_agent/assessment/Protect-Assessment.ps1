@@ -9,7 +9,8 @@ function Test-FleetStorageSecurity {
     foreach($rule in @($Rules)) {
         if($rule.AccessControlType -ne 'Allow' -or ($rule.PropagationFlags -band [Security.AccessControl.PropagationFlags]::InheritOnly)){continue}
         $sid=$rule.IdentityReference.Translate([Security.Principal.SecurityIdentifier]).Value
-        if($sid -notin $trusted -and ([int64]$rule.FileSystemRights -band $mask)){return $false}
+        # OWNER RIGHTS applies only to the owner validated above.
+        if($sid -notin ($trusted+@('S-1-3-4')) -and ([int64]$rule.FileSystemRights -band $mask)){return $false}
     }
     return $true
 }

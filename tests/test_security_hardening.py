@@ -107,6 +107,12 @@ def test_windows_parent_acl_is_checked_before_permission_changes(tmp_path, monke
     )
     with pytest.raises(PermissionError, match="owner"):
         private_dir(folder)
+    monkeypatch.setattr(
+        host_platform,
+        "_windows_security",
+        lambda path: ("S-1-5-21-123", [("S-1-3-4", 0x1F01FF)]),
+    )
+    host_platform.validate_private_location(folder)
 
 
 def test_overlapping_pins_key_rotation_and_accounts_share_one_claim():

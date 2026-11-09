@@ -98,7 +98,10 @@ def validate_private_location(path):
             if owner not in (trusted if item == path else system_owners):
                 raise PermissionError(f"Private storage has an untrusted owner: {item}")
             if item != path and any(
-                sid not in trusted and mask & 0x100D0040 for sid, mask in grants
+                # OWNER RIGHTS is the already-validated object's owner, not
+                # an additional principal (used by Python's secure mkdir).
+                sid not in trusted | {"S-1-3-4"} and mask & 0x100D0040
+                for sid, mask in grants
             ):
                 raise PermissionError(
                     f"Private storage parent allows replacement: {item}"
