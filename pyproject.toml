@@ -19,7 +19,7 @@ dependencies = [
 
 [project.optional-dependencies]
 browser = ["pytest-playwright>=0.10,<0.11"]
-dev = ["pytest>=8.0", "pytest-asyncio>=0.23", "ruff>=0.6"]
+dev = ["pytest>=9.2.0", "pytest-asyncio>=0.23", "ruff>=0.6"]
 
 [project.scripts]
 remote-fleet-agent = "remote_fleet_agent.cli:main"
