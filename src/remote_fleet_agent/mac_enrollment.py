@@ -110,6 +110,15 @@ def context(folder, address):
 
 
 class MacEnrollment:
+    platform = "macos"
+    label = "Mac"
+    kernel = "Darwin"
+    kind = "mac_enrollment"
+    defaults = MAC_SETUP_DEFAULTS
+    connect_asset = "Connect.command"
+    remove_asset = "Remove.command"
+    architectures = ("arm64", "x86_64")
+
     def __init__(self, service):
         self.service = service
         self.listeners = {}
@@ -117,9 +126,9 @@ class MacEnrollment:
         self.receivers = set()
         if service.store.integrity:
             for row in service.store.db.execute(
-                "SELECT id,client FROM records WHERE kind='mac_enrollment'"
+                "SELECT id,client FROM records WHERE kind=?", (self.kind,)
             ).fetchall():
-                old = service.store.get("mac_enrollment", row["id"], row["client"])
+                old = service.store.get(self.kind, row["id"], row["client"])
                 if old["connection_state"] in ("waiting", "verifying"):
                     self.update(
                         old,
@@ -130,6 +139,7 @@ class MacEnrollment:
                     )
                 elif old["python_state"] in (
                     "pending",
+                    "checking",
                     "downloading",
                     "uploading",
                     "installing",
@@ -227,12 +237,12 @@ class MacEnrollment:
         self.service.grants(actor, client)
         rows = [
             self.present(r)
-            for r in self.service.store.list("mac_enrollment", client)
+            for r in self.service.store.list(self.kind, client)
             if self.service.permitted(actor, client, r["site"])
         ]
         return {
             "controller_address": local_address(),
-            "defaults": dict(MAC_SETUP_DEFAULTS),
+            "defaults": dict(self.defaults),
             "devices": rows[:100],
         }
 
@@ -241,9 +251,7 @@ class MacEnrollment:
         return {k: v for k, v in record.items() if k not in ("token_hash", "policy")}
 
     def update(self, record, **changes):
-        current = self.service.store.get(
-            "mac_enrollment", record["id"], record["client"]
-        )
+        current = self.service.store.get(self.kind, record["id"], record["client"])
         actor = {"id": current["owner_id"]}
         value = {
             k: v
@@ -251,7 +259,7 @@ class MacEnrollment:
             if k not in ("id", "site", "owner_id", "revision")
         }
         return self.service.store.save(
-            "mac_enrollment",
+            self.kind,
             current["client"],
             current["site"],
             actor,
@@ -276,7 +284,7 @@ class MacEnrollment:
         address = private_ipv4(data.get("controller_address") or local_address())
         token = secrets.token_urlsafe(32)
         record = self.service.store.save(
-            "mac_enrollment",
+            self.kind,
             client,
             site,
             actor,
@@ -288,6 +296,7 @@ class MacEnrollment:
                 "connection_state": "waiting",
                 "python_state": "pending" if install else "skipped",
                 "install_python": install,
+                "platform": self.platform,
                 "controller_address": address,
             },
         )
@@ -346,7 +355,7 @@ class MacEnrollment:
         )
         script = (
             files("remote_fleet_agent")
-            .joinpath("enrollment_assets/Connect.command")
+            .joinpath("enrollment_assets", self.connect_asset)
             .read_text()
             .replace("@@METADATA@@", metadata)
         )
@@ -366,11 +375,17 @@ cat "$tmp" > "$file"
 echo 'This kit’s source-bound key removed. Other keys and Remote Login settings are preserved.'
 """
         )
+        if self.platform == "linux":
+            removal = (
+                removal.replace("stat -f %u", "stat -c %u")
+                .replace("stat -f %l", "stat -c %h")
+                .replace("Remote Login settings", "SSH service settings")
+            )
         out = io.BytesIO()
         with ZipFile(out, "w", ZIP_DEFLATED) as archive:
             for name, content in [
-                ("Connect.command", script),
-                ("Remove.command", removal),
+                (self.connect_asset, script),
+                (self.remove_asset, removal),
             ]:
                 item = ZipInfo(name)
                 item.create_system = 3
@@ -378,10 +393,15 @@ echo 'This kit’s source-bound key removed. Other keys and Remote Login setting
                 archive.writestr(item, content)
             archive.writestr(
                 "READ-ME.txt",
-                "Copy Connect.command to ONE Mac, double-click it and approve the administrator prompt. Keep this controller and workspace running on the same private network. Kit expires in 30 minutes and is single-use. macOS may require Remote Login approval in System Settings. No Python is needed for connection or native evidence. Optional Python setup runs only after verified SSH. Access persists until Remove.command is run or the configured client expiry is reached; deleting this kit or revoking pairing does not remove an installed SSH key. Do not share or commit the kit. Remove.command removes only this exact source-bound key. General administration remains separately controlled.\n",
+                f"Copy {self.connect_asset} to ONE {self.label} device and run it as the target account. Approve the administrator prompt if needed. Keep this controller and workspace running on the same private network. Kit expires in 30 minutes and is single-use. No Python is needed for pairing or native checks. Python setup runs after verified SSH by default. Access persists until {self.remove_asset} is run or configured client expiry is reached. Revoking pairing does not remove an installed SSH key. Keep the kit private; never commit it. Existing accounts, independent keys and general administration policy are preserved. "
+                + (
+                    "On Linux, run: sh ./Connect.sh. The kit can install OpenSSH Server and curl using apt, dnf, zypper, apk or pacman if absent, and start the existing SSH service. It does not change SSH configuration or firewall rules. Custom SSH policies may require administrator setup. Run as a named account, not root.\n"
+                    if self.platform == "linux"
+                    else "macOS may require Remote Login approval in System Settings.\n"
+                ),
             )
         return {
-            "filename": f"{client}-mac-connect.zip",
+            "filename": f"{client}-{'mac' if self.platform == 'macos' else 'linux'}-connect.zip",
             "zip_base64": base64.b64encode(out.getvalue()).decode(),
             "enrollment": self.present(record),
         }
@@ -440,9 +460,7 @@ echo 'This kit’s source-bound key removed. Other keys and Remote Login setting
                 pass
 
     async def accept(self, record, data, peer):
-        current = self.service.store.get(
-            "mac_enrollment", record["id"], record["client"]
-        )
+        current = self.service.store.get(self.kind, record["id"], record["client"])
         if (
             not isinstance(data, dict)
             or data.get("kit") != record["id"]
@@ -513,17 +531,26 @@ echo 'This kit’s source-bound key removed. Other keys and Remote Login setting
             )
             probe = await asyncio.wait_for(
                 conn.run(
-                    "/usr/bin/uname -s; /usr/bin/id -un; /usr/bin/uname -m", check=True
+                    (
+                        "/usr/bin/uname -s; /usr/bin/id -un; /usr/bin/uname -m"
+                        if self.platform == "macos"
+                        else "uname -s; id -un; uname -m"
+                    ),
+                    check=True,
                 ),
                 10,
             )
             identity = probe.stdout.strip().splitlines()
             if (
                 len(identity) != 3
-                or identity[:2] != ["Darwin", username]
-                or identity[2] not in ("arm64", "x86_64")
+                or identity[:2] != [self.kernel, username]
+                or not re.fullmatch(r"[A-Za-z0-9_.-]{1,64}", identity[2])
+                or (
+                    self.architectures is not None
+                    and identity[2] not in self.architectures
+                )
             ):
-                raise Denied("SSH endpoint identity did not match the Mac receipt")
+                raise Denied("SSH endpoint identity did not match the device receipt")
             self.permission(actor, record["client"], record["site"])
             folder = private_dir(self.service.store.folder / "pairing")
             with locked(folder / "registration.lock"):
@@ -554,12 +581,14 @@ echo 'This kit’s source-bound key removed. Other keys and Remote Login setting
                     "simulation": False,
                 }
                 device_id = resolve_device(target)
-                name = "mac-" + device_id[:12]
+                name = ("mac-" if self.platform == "macos" else "linux-") + device_id[
+                    :12
+                ]
                 raw.setdefault("hosts", []).append(
                     {
                         "name": name,
                         "target": target["target"],
-                        "platform": "macos",
+                        "platform": self.platform,
                         "approved": True,
                         "site": record["site"],
                         "device_id": device_id,
@@ -579,7 +608,10 @@ echo 'This kit’s source-bound key removed. Other keys and Remote Login setting
             )
             connected = True
             if record["install_python"]:
-                from remote_fleet_agent.mac_runtime import provision
+                if self.platform == "macos":
+                    from remote_fleet_agent.mac_runtime import provision
+                else:
+                    from remote_fleet_agent.linux_runtime import provision
 
                 signature = self.service.fingerprint(record["client"])
 
@@ -594,7 +626,7 @@ echo 'This kit’s source-bound key removed. Other keys and Remote Login setting
                     )
 
                 claim = EndpointClaim(
-                    {**target, "device_id": device_id}, "mac-enrollment:" + record["id"]
+                    {**target, "device_id": device_id}, self.kind + ":" + record["id"]
                 )
                 permission()
                 dispatched = True
@@ -616,9 +648,7 @@ echo 'This kit’s source-bound key removed. Other keys and Remote Login setting
                 claim = None
             raise
         except Exception:  # noqa: BLE001 - sanitize remote errors; never echo private details
-            current = self.service.store.get(
-                "mac_enrollment", record["id"], record["client"]
-            )
+            current = self.service.store.get(self.kind, record["id"], record["client"])
             uncertain = current["python_state"] in ("uploading", "installing")
             if claim and uncertain:
                 claim.mark_unknown()
@@ -653,10 +683,10 @@ echo 'This kit’s source-bound key removed. Other keys and Remote Login setting
 
     async def revoke(self, actor, client, ident):
         self.service.store.require(self.service.store.operator(actor["id"]), "*")
-        record = self.service.store.get("mac_enrollment", ident, client)
+        record = self.service.store.get(self.kind, ident, client)
         if record["connection_state"] != "waiting":
             raise ValueError(
-                "Only waiting kits can be revoked. Use Remove.command to remove installed access."
+                "Only waiting kits can be revoked. Use the kit removal script to remove installed access."
             )
         listener = self.listeners.pop(ident, None)
         if listener:

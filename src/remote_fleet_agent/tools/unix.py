@@ -63,7 +63,7 @@ def build_command(platform, operation, section):
         + "),'<fleet-fixed-probe>','exec'))"
     )
     return (
-        "python3 -c "
+        'if [ -x "$HOME/.remote-fleet-agent/python-3.13.18/bin/python3" ]; then _rf_python="$HOME/.remote-fleet-agent/python-3.13.18/bin/python3"; else _rf_python=python3; fi; "$_rf_python" -c '
         + shlex.quote(launcher)
         + " "
         + " ".join(map(shlex.quote, (platform, operation, section)))
@@ -114,6 +114,13 @@ async def collect_unix(conn, platform, operation, sections=None, timeout=30):
                 conn.run(build_command(platform, operation, name), check=False),
                 timeout=timeout,
             )
+            native_linux = platform == "linux" and bool(result.exit_status)
+            if native_linux:
+                from remote_fleet_agent.tools import linux_native
+
+                result = await asyncio.wait_for(
+                    conn.run(linux_native.command(name), check=False), timeout=timeout
+                )
             if result.exit_status:
                 raise RuntimeError(
                     "Fixed probe failed; check account permissions and platform prerequisites. "
@@ -125,6 +132,8 @@ async def collect_unix(conn, platform, operation, sections=None, timeout=30):
                 from remote_fleet_agent.tools.macos_native import parse
 
                 value = parse(name, result.stdout)
+            elif native_linux:
+                value = linux_native.parse(name, result.stdout)
             else:
                 value = json.loads(result.stdout)
             if (
@@ -149,7 +158,7 @@ async def collect_unix(conn, platform, operation, sections=None, timeout=30):
         else "partial"
     )
     report["coverage_notes"] = {
-        "platform": "macOS uses native tools without Python; Linux requires Python 3. Reads account-visible metadata only. No sudo, installation, discovery or repairs.",
+        "platform": "macOS uses native tools without Python; Linux uses available Python with native fallback while setup is pending. Reads account-visible metadata only. No sudo, installation, discovery or repairs.",
         "software": "Linux: dpkg/rpm package registrations; macOS: system_profiler application registrations. Per-user/portable applications may be absent.",
         "security": "Unavailable firewall, encryption, antivirus or privileged evidence is unknown, never a pass.",
         "container": "Containers share a Linux kernel and cannot validate physical disk encryption, systemd or macOS/Windows behavior.",

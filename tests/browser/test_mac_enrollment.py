@@ -18,10 +18,8 @@ def test_owner_adds_mac_client_downloads_kit_and_revokes_it(
     expect(page.get_by_role("button", name="Create Mac connection kit")).to_be_visible()
     page.get_by_role("button", name="Create Mac connection kit").click()
     page.get_by_label("Controller private IPv4").fill("127.0.0.1")
-    expect(
-        page.get_by_label("Install private Python after SSH is connected")
-    ).to_be_checked()
-    page.get_by_label("Install private Python after SSH is connected").uncheck()
+    expect(page.get_by_label("Set up Python after SSH is connected")).to_be_checked()
+    page.get_by_label("Set up Python after SSH is connected").uncheck()
     with page.expect_download() as downloaded:
         page.get_by_role("button", name="Save", exact=True).click()
     output = tmp_path / "private-kit.zip"
@@ -44,3 +42,25 @@ def test_simulated_client_cannot_generate_real_mac_access(
     expect(page.get_by_role("button", name="Create Mac connection kit")).to_have_count(
         0
     )
+
+
+def test_owner_can_generate_linux_connection_kit(page, workspace, signed_in, tmp_path):
+    app, _, _ = workspace
+    page.goto(app.url + "/?page=Settings")
+    page.get_by_role("button", name="Add authorized client").click()
+    page.get_by_label("Client ID").fill("linux-enrollment-lab")
+    page.get_by_label("Authorization reference").fill("FICTIONAL-LINUX-TEST")
+    page.get_by_role("button", name="Save", exact=True).click()
+    page.get_by_role("button", name="Create Linux connection kit").click()
+    expect(page.get_by_label("Set up Python after SSH is connected")).to_be_checked()
+    page.get_by_label("Controller private IPv4").fill("127.0.0.1")
+    with page.expect_download() as download:
+        page.get_by_role("button", name="Save", exact=True).click()
+    output = tmp_path / "private-linux-kit.zip"
+    download.value.save_as(output)
+    with ZipFile(output) as archive:
+        assert "Connect.sh" in archive.namelist()
+        assert "Connect.command" not in archive.namelist()
+    expect(page.get_by_text("Waiting for Linux", exact=True)).to_be_visible()
+    page.get_by_role("button", name="Revoke unused kit").click()
+    expect(page.get_by_text("Linux · SSH: Revoked", exact=False)).to_be_visible()

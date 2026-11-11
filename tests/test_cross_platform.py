@@ -222,6 +222,9 @@ async def test_unix_failures_remain_unknown_and_do_not_become_passes():
             side_effect=[
                 SimpleNamespace(exit_status=127, stderr="python3 missing", stdout=""),
                 SimpleNamespace(
+                    exit_status=1, stderr="native OS evidence unavailable", stdout=""
+                ),
+                SimpleNamespace(
                     exit_status=0,
                     stderr="",
                     stdout='{"status":"collected","items":[{"DeviceID":"/","Size":100,"FreeSpace":5}]}',
@@ -252,7 +255,7 @@ def test_probe_allows_only_fixed_selection():
         with pytest.raises(ValueError):
             build_command(*values)
     command = build_command("linux", "inventory", "os")
-    assert command.startswith("python3 -c ")
+    assert '"$_rf_python" -c ' in command
     assert command.endswith("linux inventory os")
     command = build_command("macos", "inventory", "os")
     assert (

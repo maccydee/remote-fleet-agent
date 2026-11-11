@@ -18,7 +18,7 @@ Windows, macOS and Linux devices over SSH.</p>
   <img src="https://img.shields.io/badge/MCP-stdio-7156D9?style=flat-square" alt="MCP stdio">
 </p>
 
-[Walkthrough](#product-walkthrough) · [Quick start](#quick-start) · [Mac setup](#connect-a-mac) · [AI integrations](#connect-your-ai-client) · [How it works](#how-it-works) · [Documentation](#documentation)
+[Walkthrough](#product-walkthrough) · [Quick start](#quick-start) · [Mac setup](#connect-a-mac) · [Linux setup](#connect-a-linux-device) · [AI integrations](#connect-your-ai-client) · [How it works](#how-it-works) · [Documentation](#documentation)
 
 </div>
 
@@ -178,6 +178,10 @@ Start with [deployment and enrollment](docs/DEPLOYMENT.md), [scope and access po
 The default Mac target setup is a connection kit. In **Settings**, add an authorized client or select an existing real client, then choose **Create Mac connection kit**. Copy the kit to one Mac and double-click `Connect.command`. It returns the account and host key automatically; the controller verifies SSH before registering the device. Native checks work without Python. Private Python setup is enabled by default and runs afterward over that verified connection. You can deselect it when creating the kit.
 
 The kit expires after 30 minutes. macOS may ask you to approve Remote Login in System Settings. See the [Mac setup guide](docs/MAC-ENROLLMENT.md) for network requirements and removing access.
+
+## Connect a Linux device
+
+In **Settings → Create Linux connection kit**, generate a kit for an authorized client. Extract it on the Linux target and run `sh ./Connect.sh` as the target account. Identity pairs automatically, native checks work without Python, and Python setup follows verified SSH by default. Existing suitable Python is reused; otherwise a private runtime is installed remotely. See the [Linux setup guide](docs/LINUX-ENROLLMENT.md) for supported systems and removing access.
 
 ## Validation status
 

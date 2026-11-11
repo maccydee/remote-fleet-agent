@@ -61,7 +61,7 @@ A modified Compose file or Dockerfile is rejected by these convenience commands.
 
 Mac targets default to the [connection kit](MAC-ENROLLMENT.md): create it in workspace Settings and double-click it on the target. The kit handles approved Remote Login access and identity return. Native Mac checks need no Python; private Python setup runs after verified SSH by default and can be deselected.
 
-Linux targets use existing approved SSH access and Python 3. The toolkit does not change Linux SSH settings or create endpoint users. The manual configuration below also supports existing, independently provisioned Mac access.
+Linux targets default to the [Linux connection kit](LINUX-ENROLLMENT.md): run `sh ./Connect.sh` as the target account. It pairs automatically, provides native fallback checks and sets up Python after verified SSH by default. The manual configuration below remains available for independently provisioned Mac and Linux access.
 
 Add an explicit platform to each approved device:
 
@@ -94,7 +94,7 @@ The commands and MCP tools remain `inventory`, `diagnostics`, `readiness`, `star
 | Antivirus health | Unknown pending product-specific evidence | Unknown pending product-specific evidence |
 | Diagnostics | Load, failed systemd units, selected reboot marker, DNS and storage | Load, account-visible launchd units, DNS and storage; reboot state unknown |
 
-Queries do not use `sudo`, install packages, repair devices or collect password hashes, encryption recovery keys, document contents or event-message bodies. Linux probes require Python 3. Mac probes use native tools without Python. Missing commands, permissions, unexpected output and timeouts become per-section unknown results.
+Queries do not use `sudo`, install packages, repair devices or collect password hashes, encryption recovery keys, document contents or event-message bodies. Linux probes use the private or system Python when available, with native fallback while Python is unavailable. Mac probes use native tools without Python. Missing commands, permissions, unexpected output and timeouts become per-section unknown results.
 
 Readiness reports the ability to collect metadata and available prerequisites. It does not approve Unix maintenance. `clear_dns_cache`, Windows service actions, `run_check` and `fit_check` remain Windows-only and reject a Mac, Linux or simulated host before connecting. Existing maintenance previews also bind the platform and SSH port, so a changed endpoint requires a fresh preview.
 

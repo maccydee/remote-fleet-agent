@@ -335,13 +335,18 @@ class Application:
         service.grants(actor, client)
         if site:
             service.require_site(actor, client, site)
-        if action == "mac-enrollment":
+        if action in ("mac-enrollment", "linux-enrollment"):
+            enrollment = (
+                service.mac_enrollment
+                if action == "mac-enrollment"
+                else service.linux_enrollment
+            )
             if method == "GET" and len(parts) == 4:
-                return service.mac_enrollment.status(actor, client)
+                return enrollment.status(actor, client)
             if method == "POST" and len(parts) == 4:
-                return await service.mac_enrollment.kit(actor, client, data)
+                return await enrollment.kit(actor, client, data)
             if method == "POST" and len(parts) == 6 and parts[5] == "revoke":
-                return await service.mac_enrollment.revoke(actor, client, parts[4])
+                return await enrollment.revoke(actor, client, parts[4])
             raise FileNotFoundError("Enrollment route not found.")
         if action in ("investigations", "repair-plans"):
             workflow = (

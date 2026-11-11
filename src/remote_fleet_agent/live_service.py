@@ -60,6 +60,9 @@ class LiveService:
         from remote_fleet_agent.mac_enrollment import MacEnrollment
 
         self.mac_enrollment = MacEnrollment(self)
+        from remote_fleet_agent.linux_enrollment import LinuxEnrollment
+
+        self.linux_enrollment = LinuxEnrollment(self)
 
     def load_registry(self):
         value = read_json(self.directory / "workspace.json")
@@ -731,6 +734,7 @@ class LiveService:
 
     async def tick(self, now=None):
         await self.mac_enrollment.tick()
+        await self.linux_enrollment.tick()
         await self.repairs.tick()
         now = now or datetime.now(UTC)
         for client in self.load_registry():
@@ -933,7 +937,7 @@ class LiveService:
         commands = {
             "windows": f'powershell.exe -NoProfile -ExecutionPolicy Bypass -File ".\\Install-Assessment.ps1" -Engagement "{client}" -AllowedIP "ENGINEER_IPV4"',
             "macos": "Owners can generate a single-use Mac connection kit in Settings. Native checks work over verified SSH without Python; optional private Python setup follows connection.",
-            "linux": "Use an existing approved unprivileged SSH account with Python 3. Verify the host key through your trusted provisioning process.",
+            "linux": "Owners can generate a single-use Linux connection kit in Settings. Run Connect.sh as the target account; identity pairs automatically, native checks need no Python, and Python setup follows verified SSH by default.",
         }
         return {
             "access": snap["access"],
@@ -1065,6 +1069,7 @@ class LiveService:
 
     async def close(self):
         await self.mac_enrollment.close()
+        await self.linux_enrollment.close()
         await self.repairs.close()
         await self.support.close()
         for _, rt in self.runtimes.values():

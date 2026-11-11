@@ -76,6 +76,7 @@ def build_server(
     @safe_tool(annotations=readonly)
     async def describe_capabilities() -> dict:
         """List available fixed queries and whether an engagement is configured."""
+        from remote_fleet_agent.linux_enrollment import LINUX_SETUP_DEFAULTS
         from remote_fleet_agent.mac_enrollment import MAC_SETUP_DEFAULTS
 
         return {
@@ -89,7 +90,8 @@ def build_server(
                 for p in ("windows", "macos", "linux")
             },
             "target_setup": {
-                "macos": {**MAC_SETUP_DEFAULTS, "workspace_page": "Settings"}
+                "macos": {**MAC_SETUP_DEFAULTS, "workspace_page": "Settings"},
+                "linux": {**LINUX_SETUP_DEFAULTS, "workspace_page": "Settings"},
             },
             "maintenance_platforms": ["windows"],
             "mutating_endpoint_tools": [],

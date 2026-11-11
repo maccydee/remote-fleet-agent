@@ -28,7 +28,12 @@ ARTIFACTS = {
 
 
 def validate_archive(path):
+    """Resolve the complete archive link graph before any remote extraction."""
     total = 0
+    members = []
+    links = {}
+    raw_links = []
+    names = set()
     with tarfile.open(path, "r:gz") as archive:
         for count, member in enumerate(archive):
             if count > 100000:
@@ -41,31 +46,66 @@ def validate_archive(path):
                 or name.parts[0] != "python"
             ):
                 raise ValueError("Unsafe runtime archive path")
+            text = str(name)
+            if text in names:
+                raise ValueError("Duplicate runtime archive path")
+            names.add(text)
+            members.append(text)
             if member.issym() or member.islnk():
-                if ".." in PurePosixPath(member.linkname).parts:
-                    raise ValueError(
-                        "Runtime links must not traverse parent directories"
-                    )
-                target = (
-                    (name.parent / member.linkname)
-                    if member.issym()
-                    else PurePosixPath(member.linkname)
-                )
-                if not target.parts or target.parts[0] != "python":
-                    raise ValueError("Runtime link escapes Python directory")
-                depth = 0
-                for part in target.parts:
-                    if part == "..":
-                        depth -= 1
-                    elif part != ".":
-                        depth += 1
-                    if depth < 1 or target.is_absolute():
-                        raise ValueError("Unsafe runtime archive link")
+                link = PurePosixPath(member.linkname)
+                if link.is_absolute() or not member.linkname:
+                    raise ValueError("Unsafe runtime archive link")
+                raw_links.append((name, link, member.issym()))
+                links[text] = str(name.parent / link) if member.issym() else str(link)
             elif not member.isfile() and not member.isdir():
                 raise ValueError("Unsupported runtime archive member")
             total += member.size
             if total > 300_000_000:
                 raise ValueError("Runtime archive exceeds unpacked limit")
+
+    def resolve(parts, seen=frozenset()):
+        stack = []
+        for part in parts:
+            if part in ("", "."):
+                continue
+            if part == "..":
+                if len(stack) <= 1:
+                    raise ValueError("Runtime link escapes Python directory")
+                stack.pop()
+            else:
+                stack.append(part)
+                name = "/".join(stack)
+                if name in links:
+                    if name in seen or len(seen) >= 64:
+                        raise ValueError("Cyclic runtime archive link")
+                    stack = resolve(links[name].split("/"), seen | {name})
+            if not stack or stack[0] != "python":
+                raise ValueError("Runtime link escapes Python directory")
+        if not stack or stack[0] != "python":
+            raise ValueError("Runtime link escapes Python directory")
+        return stack
+
+    # A member beneath a directory symlink is installed at its resolved parent.
+    # Canonicalize link names as well as targets, so aliases cannot hide a link.
+    for _ in range(65):
+        canonical = {}
+        for name, target, symbolic in raw_links:
+            parent = resolve(name.parent.parts)
+            key = "/".join([*parent, name.name])
+            if key in canonical:
+                raise ValueError("Colliding runtime archive link paths")
+            canonical[key] = (
+                "/".join([*parent, *target.parts]) if symbolic else str(target)
+            )
+        if canonical == links:
+            break
+        links = canonical
+    else:
+        raise ValueError("Runtime link graph did not converge")
+    for name, target in links.items():
+        resolve(target.split("/"), frozenset({name}))
+    for name in members:
+        resolve(name.split("/"))
 
 
 def download(architecture, path):

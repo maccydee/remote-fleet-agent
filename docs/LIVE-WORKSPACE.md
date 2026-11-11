@@ -1,6 +1,6 @@
 # Local fleet workspace
 
-The local app opens on Operations across all permitted clients. Use your chosen AI client for conversations; use this workspace to oversee investigations, review repairs, approve changes and inspect outcomes. Device evidence, reviewed collections, manual records, follow-ups, comparisons, collection schedules and reports remain available. The dashboard listens on **127.0.0.1 only**. Owner-created Mac kits temporarily open a separate certificate-pinned listener on the chosen private network address. It is a local engineer workspace, not a hosted remote-access service.
+The local app opens on Operations across all permitted clients. Use your chosen AI client for conversations; use this workspace to oversee investigations, review repairs, approve changes and inspect outcomes. Device evidence, reviewed collections, manual records, follow-ups, comparisons, collection schedules and reports remain available. The dashboard listens on **127.0.0.1 only**. Owner-created Mac and Linux kits temporarily open a separate certificate-pinned listener on the chosen private network address. It is a local engineer workspace, not a hosted remote-access service.
 
 ## Start with fictional devices
 
@@ -30,7 +30,7 @@ The app performs no network discovery and creates no endpoint users. Inventory c
 
 Add an optional `"site": "head-office"` to each approved host. Older configurations default to `main`. Site names use the same short-name format as host names. Moving a host between sites changes who can see its saved evidence, so review operator scope when changing the fleet file.
 
-Windows onboarding shows how to prepare the existing assessment kit, with a placeholder for the engineer’s approved IPv4 address. Mac onboarding defaults to the connection kit above. Existing manually provisioned, pinned Mac SSH accounts remain supported. Linux instructions require existing approved SSH access and Python 3. Docker Linux remains a separate disposable SSH lab; simulated macOS is not native macOS validation.
+Windows onboarding shows how to prepare the existing assessment kit, with a placeholder for the engineer’s approved IPv4 address. Mac onboarding defaults to the connection kit above. Existing manually provisioned, pinned Mac SSH accounts remain supported. Linux onboarding also defaults to a [connection kit](LINUX-ENROLLMENT.md), with native fallback checks and Python setup after verified SSH. Docker Linux remains a separate disposable SSH lab; simulated macOS is not native macOS validation.
 
 ## Operators and scope
 

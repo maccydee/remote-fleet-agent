@@ -66,3 +66,13 @@ id_rsa*
 
 # Single-use pairing kits contain enrollment credentials.
 *-mac-connect.zip
+
+*-linux-connect.zip
+
+# Extracted enrollment scripts contain single-use pairing credentials.
+Connect.sh
+Remove.sh
+Connect.command
+Remove.command
+!src/remote_fleet_agent/enrollment_assets/Connect.sh
+!src/remote_fleet_agent/enrollment_assets/Connect.command

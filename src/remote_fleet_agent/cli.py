@@ -84,7 +84,7 @@ def main() -> None:
 
     parser = argparse.ArgumentParser(
         prog="remote-fleet-agent",
-        epilog="Mac target setup: open the workspace Settings and create a Mac connection kit. Account and host identity pair automatically; Python setup follows verified SSH by default.",
+        epilog="Mac/Linux target setup: open workspace Settings and create a connection kit. Account and host identity pair automatically; Python setup follows verified SSH by default.",
     )
     sub = parser.add_subparsers(dest="command", required=True)
     init_parser = sub.add_parser(
