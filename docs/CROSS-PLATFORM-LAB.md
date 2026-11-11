@@ -59,7 +59,9 @@ A modified Compose file or Dockerfile is rejected by these convenience commands.
 
 ## Collect from approved Mac and Linux machines
 
-Use existing SSH access and install Python 3 separately if it is absent. This release does not enable Remote Login on a Mac, change Linux SSH settings, create users, install dependencies remotely or manage Unix access expiry.
+Mac targets default to the [connection kit](MAC-ENROLLMENT.md): create it in workspace Settings and double-click it on the target. The kit handles approved Remote Login access and identity return. Native Mac checks need no Python; private Python setup runs after verified SSH by default and can be deselected.
+
+Linux targets use existing approved SSH access and Python 3. The toolkit does not change Linux SSH settings or create endpoint users. The manual configuration below also supports existing, independently provisioned Mac access.
 
 Add an explicit platform to each approved device:
 
@@ -76,7 +78,7 @@ Add an explicit platform to each approved device:
 
 Existing configurations default to Windows and port 22. `platform` accepts only `windows`, `macos` or `linux`. For multiple devices sharing a username/address at different ports, select by device name; the bare target is ambiguous and is rejected.
 
-Verify each SSH host key through a trusted console or provisioning process before adding it to `known_hosts`. A nonstandard port needs the OpenSSH `[address]:port` host-key format.
+For manual registration, verify each SSH host key through a trusted console or provisioning process before adding it to `known_hosts`. Mac connection kits return the key over certificate-pinned HTTPS and verify SSH automatically. A nonstandard port needs the OpenSSH `[address]:port` host-key format.
 
 The commands and MCP tools remain `inventory`, `diagnostics`, `readiness`, `start_job` and the existing saved-evidence tools. `describe_capabilities` lists selectable sections by platform. A section unavailable on the selected platform is rejected before connecting; a mixed-platform job needs sections supported by every selected host, or separate jobs by platform/group.
 
@@ -84,15 +86,15 @@ The commands and MCP tools remain `inventory`, `diagnostics`, `readiness`, `star
 | --- | --- | --- |
 | OS, architecture, disk space | Kernel, distribution and root filesystem | macOS version/build and root filesystem |
 | Hardware | Account-visible architecture and memory | `sysctl` model and memory |
-| Software | dpkg or rpm registrations | Top-level shared/system Applications bundles |
+| Software | dpkg or rpm registrations | Native system_profiler application registrations |
 | Accounts | Local users and direct sudo/wheel membership | Local users and direct admin-group membership |
-| Network/DNS | IP-tool metadata and resolv.conf | ifconfig metadata and resolv.conf |
+| Network/DNS | IP-tool metadata and resolv.conf | ifconfig metadata and scutil resolver evidence |
 | Firewall | Accessible UFW state; other managers remain unknown | Application Firewall global state |
 | Encryption | Unknown pending separate LUKS/device verification | Recognized FileVault status when accessible |
 | Antivirus health | Unknown pending product-specific evidence | Unknown pending product-specific evidence |
 | Diagnostics | Load, failed systemd units, selected reboot marker, DNS and storage | Load, account-visible launchd units, DNS and storage; reboot state unknown |
 
-Queries do not use `sudo`, install packages, repair devices or collect password hashes, encryption recovery keys, document contents or event-message bodies. Python 3 is required for the Unix probes. Missing commands, permissions, unexpected output and timeouts become per-section unknown results.
+Queries do not use `sudo`, install packages, repair devices or collect password hashes, encryption recovery keys, document contents or event-message bodies. Linux probes require Python 3. Mac probes use native tools without Python. Missing commands, permissions, unexpected output and timeouts become per-section unknown results.
 
 Readiness reports the ability to collect metadata and available prerequisites. It does not approve Unix maintenance. `clear_dns_cache`, Windows service actions, `run_check` and `fit_check` remain Windows-only and reject a Mac, Linux or simulated host before connecting. Existing maintenance previews also bind the platform and SSH port, so a changed endpoint requires a fresh preview.
 

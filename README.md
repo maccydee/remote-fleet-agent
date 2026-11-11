@@ -18,7 +18,7 @@ Windows, macOS and Linux devices over SSH.</p>
   <img src="https://img.shields.io/badge/MCP-stdio-7156D9?style=flat-square" alt="MCP stdio">
 </p>
 
-[Walkthrough](#product-walkthrough) · [Quick start](#quick-start) · [AI integrations](#connect-your-ai-client) · [How it works](#how-it-works) · [Documentation](#documentation)
+[Walkthrough](#product-walkthrough) · [Quick start](#quick-start) · [Mac setup](#connect-a-mac) · [AI integrations](#connect-your-ai-client) · [How it works](#how-it-works) · [Documentation](#documentation)
 
 </div>
 
