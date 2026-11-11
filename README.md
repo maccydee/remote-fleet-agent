@@ -14,7 +14,7 @@ Windows, macOS and Linux devices over SSH.</p>
 <p>
   <a href="https://github.com/maccydee/remote-fleet-agent/actions/workflows/compatibility.yml"><img src="https://github.com/maccydee/remote-fleet-agent/actions/workflows/compatibility.yml/badge.svg" alt="Host and MCP compatibility"></a>
   <a href="https://github.com/maccydee/remote-fleet-agent/actions/workflows/secret-check.yml"><img src="https://github.com/maccydee/remote-fleet-agent/actions/workflows/secret-check.yml/badge.svg" alt="Secret checks"></a>
-  <img src="https://img.shields.io/badge/Python-3.11%2B-7156D9?style=flat-square" alt="Python 3.11 or newer">
+  <img src="https://img.shields.io/badge/Python-3.11%2B-7156D9?style=flat-square" alt="Controller requires Python 3.11 or newer">
   <img src="https://img.shields.io/badge/MCP-stdio-7156D9?style=flat-square" alt="MCP stdio">
 </p>
 
@@ -175,7 +175,7 @@ Start with [deployment and enrollment](docs/DEPLOYMENT.md), [scope and access po
 
 ## Connect a Mac
 
-In **Settings**, add an authorized client or select an existing real client, then choose **Create Mac connection kit**. Copy the kit to one Mac and double-click `Connect.command`. It returns the account and host key automatically; the controller verifies SSH before registering the device. Native checks work without Python. Optional private Python setup runs afterward over that verified connection.
+The default Mac target setup is a connection kit. In **Settings**, add an authorized client or select an existing real client, then choose **Create Mac connection kit**. Copy the kit to one Mac and double-click `Connect.command`. It returns the account and host key automatically; the controller verifies SSH before registering the device. Native checks work without Python. Private Python setup is enabled by default and runs afterward over that verified connection. You can deselect it when creating the kit.
 
 The kit expires after 30 minutes. macOS may ask you to approve Remote Login in System Settings. See the [Mac setup guide](docs/MAC-ENROLLMENT.md) for network requirements and removing access.
 

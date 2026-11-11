@@ -23,7 +23,7 @@ async function renderEnrollmentSettings(route) {
   if(button) button.onclick=async()=>{
     try {
       const state=await api('/api/clients/'+encodeURIComponent(client)+'/mac-enrollment');
-      form('Create a one-device Mac kit',field('Controller private IPv4','controller_address',state.controller_address,'text','required')+field('Site','site',route.site||'main','text','required')+'<label><input type="checkbox" name="install_python" checked> Install private Python after SSH is connected</label><p>This authorizes Remote Login setup and source-bound SSH key access when the kit is run. Keep the workspace running on the same private network. Access persists until removed or the client expiry. Revoking a kit does not remove an installed key.</p>',async v=>{
+      form('Create a one-device Mac kit',field('Controller private IPv4','controller_address',state.controller_address,'text','required')+field('Site','site',route.site||'main','text','required')+`<label><input type="checkbox" name="install_python" ${state.defaults.install_python?'checked':''}> Install private Python after SSH is connected</label><p>This authorizes Remote Login setup and source-bound SSH key access when the kit is run. Keep the workspace running on the same private network. Access persists until removed or the client expiry. Revoking a kit does not remove an installed key.</p>`,async v=>{
         const result=await api('/api/clients/'+encodeURIComponent(client)+'/mac-enrollment',{...v,install_python:v.install_python==='on'});
         const bytes=Uint8Array.from(atob(result.zip_base64),c=>c.charCodeAt(0));
         const url=URL.createObjectURL(new Blob([bytes],{type:'application/zip'}));

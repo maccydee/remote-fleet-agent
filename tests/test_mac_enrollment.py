@@ -424,3 +424,22 @@ async def test_real_private_runtime_in_scratch_home(tmp_path):
     )
     assert states == ["downloading", "uploading", "installing", "ready"]
     assert (tmp_path / ".remote-fleet-agent/python-3.13.18/bin/python3").exists()
+
+
+async def test_public_mac_setup_defaults_to_automatic_pairing_then_python(enroll):
+    s, owner = enroll
+    state = s.mac_enrollment.status(owner, "test-client")
+    assert state["defaults"] == {
+        "method": "connection_kit",
+        "identity": "automatic",
+        "python_required_for_connection": False,
+        "install_python": True,
+        "python_install_stage": "after_verified_ssh",
+    }
+    # Omit the option as a public API caller would: Python follows SSH by default.
+    result = await s.mac_enrollment.kit(
+        owner, "test-client", {"controller_address": "127.0.0.1"}
+    )
+    assert result["enrollment"]["install_python"] is True
+    assert result["enrollment"]["connection_state"] == "waiting"
+    assert result["enrollment"]["python_state"] == "pending"

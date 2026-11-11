@@ -1,6 +1,6 @@
 # Local fleet workspace
 
-The local app opens on Operations across all permitted clients. Use your chosen AI client for conversations; use this workspace to oversee investigations, review repairs, approve changes and inspect outcomes. Device evidence, reviewed collections, manual records, follow-ups, comparisons, collection schedules and reports remain available. It listens on **127.0.0.1 only**. It is a local engineer workspace, not a hosted remote-access service.
+The local app opens on Operations across all permitted clients. Use your chosen AI client for conversations; use this workspace to oversee investigations, review repairs, approve changes and inspect outcomes. Device evidence, reviewed collections, manual records, follow-ups, comparisons, collection schedules and reports remain available. The dashboard listens on **127.0.0.1 only**. Owner-created Mac kits temporarily open a separate certificate-pinned listener on the chosen private network address. It is a local engineer workspace, not a hosted remote-access service.
 
 ## Start with fictional devices
 
@@ -24,11 +24,13 @@ remote-fleet-agent workspace-app add-client --directory ./fleet-workspace \
 
 To enable real read-only collections, explicitly supply `--enable-collection`, `--key /private/path/to/client_key` and `--authorisation-reference "Approved engagement reference"`. The fleet file must have approved hosts and a nonempty verified known-hosts file. Optionally set `--access-expires-at 2026-12-01T18:00:00+00:00` and `--enable-schedules`.
 
-The app never discovers endpoints, installs access, creates endpoint users or accepts host fingerprints. Inventory collection uses the existing fixed inventory, diagnostics and readiness checks. The separately enabled administration workflow supports target-confirmed custom diagnostics and exact engineer-approved repair plans. Custom privileged diagnostics cannot be guaranteed read-only. Existing Windows maintenance workflows retain their separate policy checks. Client configurations and key paths are held locally; no endpoint action is enabled merely by viewing saved evidence.
+Mac targets use the [connection kit](MAC-ENROLLMENT.md) by default: **Settings → Create Mac connection kit**. Owners can add an authorized real client directly in Settings. Running the kit on a Mac enables approved SSH access and returns its identity automatically. The controller verifies SSH before registering it; private Python setup follows by default and can be deselected when creating the kit. Native Mac evidence needs no Python.
+
+The app performs no network discovery and creates no endpoint users. Inventory collection uses the existing fixed inventory, diagnostics and readiness checks. The separately enabled administration workflow supports target-confirmed custom diagnostics and exact engineer-approved repair plans. Custom privileged diagnostics cannot be guaranteed read-only. Existing Windows maintenance workflows retain their separate policy checks. Client configurations and key paths are held locally; no endpoint action is enabled merely by viewing saved evidence.
 
 Add an optional `"site": "head-office"` to each approved host. Older configurations default to `main`. Site names use the same short-name format as host names. Moving a host between sites changes who can see its saved evidence, so review operator scope when changing the fleet file.
 
-Windows onboarding shows how to prepare the existing assessment kit, with a placeholder for the engineer’s approved IPv4 address. macOS and Linux instructions require existing approved SSH access and Python 3. Docker Linux remains a separate disposable SSH lab; simulated macOS is not native macOS validation.
+Windows onboarding shows how to prepare the existing assessment kit, with a placeholder for the engineer’s approved IPv4 address. Mac onboarding defaults to the connection kit above. Existing manually provisioned, pinned Mac SSH accounts remain supported. Linux instructions require existing approved SSH access and Python 3. Docker Linux remains a separate disposable SSH lab; simulated macOS is not native macOS validation.
 
 ## Operators and scope
 

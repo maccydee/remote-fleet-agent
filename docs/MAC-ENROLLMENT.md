@@ -1,9 +1,9 @@
 # Connect a Mac
 
-Create the kit on the engineer computer. Run it on the Mac you want to support. The target needs no Python, Homebrew or developer tools to connect.
+This is the default Mac target setup for the public tool. Create the kit on the engineer computer. Run it on the Mac you want to support. The target needs no Python, Homebrew or developer tools to connect.
 
 1. Open **Settings** as the workspace owner. Add an authorized client with its authorization reference, or select an existing real client with collection enabled and a private SSH key.
-2. Choose **Create Mac connection kit**. Confirm the controller's private IPv4 address and the target's site. Leave optional Python setup checked if you want a private runtime installed after connection.
+2. Choose **Create Mac connection kit**. Confirm the controller's private IPv4 address and the target's site. Python setup is checked by default and runs only after verified SSH. Deselect it when you only need native checks.
 3. Keep the controller and workspace running. Copy the downloaded ZIP to one Mac, extract it and double-click `Connect.command`.
 4. Enter the administrator password when macOS requests it. If macOS opens Sharing settings, approve Remote Login for the current account. Return to the workspace to watch SSH verification and optional Python setup separately.
 

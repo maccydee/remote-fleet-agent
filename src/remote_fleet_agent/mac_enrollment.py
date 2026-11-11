@@ -37,6 +37,15 @@ from remote_fleet_agent.storage import (
     save_json,
 )
 
+DEFAULT_INSTALL_PYTHON = True
+MAC_SETUP_DEFAULTS = {
+    "method": "connection_kit",
+    "identity": "automatic",
+    "python_required_for_connection": False,
+    "install_python": DEFAULT_INSTALL_PYTHON,
+    "python_install_stage": "after_verified_ssh",
+}
+
 NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,63}\Z")
 
 
@@ -221,7 +230,11 @@ class MacEnrollment:
             for r in self.service.store.list("mac_enrollment", client)
             if self.service.permitted(actor, client, r["site"])
         ]
-        return {"controller_address": local_address(), "devices": rows[:100]}
+        return {
+            "controller_address": local_address(),
+            "defaults": dict(MAC_SETUP_DEFAULTS),
+            "devices": rows[:100],
+        }
 
     @staticmethod
     def present(record):
@@ -252,7 +265,7 @@ class MacEnrollment:
         if not isinstance(site, str) or not NAME.fullmatch(site):
             raise ValueError("Use a valid site name.")
         actor, entry, _ = self.permission(actor, client, site)
-        install = data.get("install_python", True)
+        install = data.get("install_python", DEFAULT_INSTALL_PYTHON)
         if type(install) is not bool:
             raise ValueError("Python setup must be an explicit boolean.")
         await self.tick()

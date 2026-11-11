@@ -76,6 +76,8 @@ def build_server(
     @safe_tool(annotations=readonly)
     async def describe_capabilities() -> dict:
         """List available fixed queries and whether an engagement is configured."""
+        from remote_fleet_agent.mac_enrollment import MAC_SETUP_DEFAULTS
+
         return {
             "read_only": True,
             "configured": runtime is not None,
@@ -85,6 +87,9 @@ def build_server(
             "platforms": {
                 p: {op: list(FleetRuntime.catalog(p, op)) for op in OPERATIONS}
                 for p in ("windows", "macos", "linux")
+            },
+            "target_setup": {
+                "macos": {**MAC_SETUP_DEFAULTS, "workspace_page": "Settings"}
             },
             "maintenance_platforms": ["windows"],
             "mutating_endpoint_tools": [],

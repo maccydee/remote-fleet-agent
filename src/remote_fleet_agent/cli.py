@@ -82,10 +82,13 @@ def init_client(
 def main() -> None:
     import argparse
 
-    parser = argparse.ArgumentParser(prog="remote-fleet-agent")
+    parser = argparse.ArgumentParser(
+        prog="remote-fleet-agent",
+        epilog="Mac target setup: open the workspace Settings and create a Mac connection kit. Account and host identity pair automatically; Python setup follows verified SSH by default.",
+    )
     sub = parser.add_subparsers(dest="command", required=True)
     init_parser = sub.add_parser(
-        "init-client", help="Generate a keypair and stage the USB install kit"
+        "init-client", help="Generate a keypair and stage the Windows USB install kit"
     )
     init_parser.add_argument("client")
     init_parser.add_argument("--stage-dir", required=True, type=Path)

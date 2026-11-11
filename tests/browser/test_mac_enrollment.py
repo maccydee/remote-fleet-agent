@@ -18,6 +18,9 @@ def test_owner_adds_mac_client_downloads_kit_and_revokes_it(
     expect(page.get_by_role("button", name="Create Mac connection kit")).to_be_visible()
     page.get_by_role("button", name="Create Mac connection kit").click()
     page.get_by_label("Controller private IPv4").fill("127.0.0.1")
+    expect(
+        page.get_by_label("Install private Python after SSH is connected")
+    ).to_be_checked()
     page.get_by_label("Install private Python after SSH is connected").uncheck()
     with page.expect_download() as downloaded:
         page.get_by_role("button", name="Save", exact=True).click()
