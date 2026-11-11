@@ -35,4 +35,4 @@ Access otherwise persists until removed, or until a configured client expiry enc
 
 ## Validation
 
-On 11 November 2026, an isolated Docker Linux controller paired a non-root Ubuntu target with no Python installed, collected native OS evidence, installed private Python 3.13.18 over pinned SSH, completed readiness checks and removed the kit's key. This exercised aarch64 with glibc. All four pinned Linux runtime archives passed digest and archive-safety checks. Those checks do not establish execution on every distribution, architecture, service manager or package manager.
+On 11 November 2026, an isolated Docker Linux controller paired a non-root Ubuntu target with no Python installed, including a run with SSH initially stopped and host keys absent, collected native OS evidence, installed private Python 3.13.18 over pinned SSH, completed readiness checks and removed the kit's key. This exercised aarch64 with glibc. All four pinned Linux runtime archives passed digest and archive-safety checks. Those checks do not establish execution on every distribution, architecture, service manager or package manager.

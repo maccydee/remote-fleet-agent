@@ -75,6 +75,7 @@ async def test_linux_kit_has_safe_native_bootstrap_and_public_defaults(enroll):
     assert "--cacert" in script and "--insecure" not in script
     assert 'from="127.0.0.1"' in script
     assert "sshd_config" not in script
+    assert script.index("sudo ssh-keygen -A") < script.index("sudo systemctl start ssh")
     assert "BEGIN OPENSSH PRIVATE KEY" not in script
     data, _ = receipt(kit)
     assert data["token"] not in json.dumps(

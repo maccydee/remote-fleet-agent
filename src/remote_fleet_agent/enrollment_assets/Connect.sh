@@ -47,6 +47,8 @@ touch "$RF_KEYS"
 if command -v setfacl >/dev/null 2>&1; then setfacl -b "$RF_KEYS"; fi
 chmod 600 "$RF_KEYS"
 if ! grep -Fqx "$RF_KEY_LINE" "$RF_KEYS"; then printf '\n%s\n' "$RF_KEY_LINE" >> "$RF_KEYS"; fi
+# Generate missing host keys before starting a previously disabled daemon.
+if [ ! -f /etc/ssh/ssh_host_ed25519_key.pub ]; then sudo ssh-keygen -A; fi
 # Existing daemon configuration, account restrictions and firewall policy are preserved.
 if command -v systemctl >/dev/null 2>&1 && [ -d /run/systemd/system ]; then
     if ! systemctl is-active --quiet ssh && ! systemctl is-active --quiet sshd; then
@@ -60,7 +62,6 @@ elif command -v service >/dev/null 2>&1; then
 else
     echo 'No supported service manager found. Existing SSH must already be listening on port 22.'
 fi
-if [ ! -f /etc/ssh/ssh_host_ed25519_key.pub ]; then sudo ssh-keygen -A; fi
 # These fields are restricted to safe ASCII before writing JSON; no target-side JSON runtime.
 RF_HOST_KEY=$(awk 'NR==1 {print $1 " " $2}' /etc/ssh/ssh_host_ed25519_key.pub)
 case "$RF_HOST_KEY" in 'ssh-ed25519 '*) ;; *) echo 'No Ed25519 SSH host key available'; exit 1;; esac
