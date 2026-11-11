@@ -173,6 +173,12 @@ Enrol explicitly authorised devices with verified SSH host keys. Keep the engage
 
 Start with [deployment and enrollment](docs/DEPLOYMENT.md), [scope and access policy](docs/LIVE-WORKSPACE.md), and [credential handling](SECURITY.md). Keep operator tokens, SSH private keys, live configurations and customer evidence out of Git. The repository includes ignore rules, a local secret-check script and a full-history CI scan.
 
+## Connect a Mac
+
+In **Settings**, add an authorized client or select an existing real client, then choose **Create Mac connection kit**. Copy the kit to one Mac and double-click `Connect.command`. It returns the account and host key automatically; the controller verifies SSH before registering the device. Native checks work without Python. Optional private Python setup runs afterward over that verified connection.
+
+The kit expires after 30 minutes. macOS may ask you to approve Remote Login in System Settings. See the [Mac setup guide](docs/MAC-ENROLLMENT.md) for network requirements and removing access.
+
 ## Validation status
 
 The [**9 November 2026 GitHub matrix**](https://github.com/maccydee/remote-fleet-agent/actions/runs/42546966870) passed on Python **3.11 and 3.13**:

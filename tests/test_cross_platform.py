@@ -251,10 +251,15 @@ def test_probe_allows_only_fixed_selection():
     ]:
         with pytest.raises(ValueError):
             build_command(*values)
-    for platform in ("linux", "macos"):
-        command = build_command(platform, "inventory", "os")
-        assert command.startswith("python3 -c ")
-        assert command.endswith(platform + " inventory os")
+    command = build_command("linux", "inventory", "os")
+    assert command.startswith("python3 -c ")
+    assert command.endswith("linux inventory os")
+    command = build_command("macos", "inventory", "os")
+    assert (
+        "python" not in command
+        and "uname -s" in command
+        and "/usr/bin/sw_vers" in command
+    )
 
 
 @pytest.mark.skipif(

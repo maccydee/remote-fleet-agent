@@ -50,6 +50,10 @@ def build_command(platform, operation, section):
         or section not in CATALOG[platform][operation]
     ):
         raise ValueError("unsupported platform query")
+    if platform == "macos":
+        from remote_fleet_agent.tools.macos_native import COMMANDS
+
+        return '[ "$(/usr/bin/uname -s)" = Darwin ] && { ' + COMMANDS[section] + "; }"
     encoded = base64.b64encode(
         Path(__file__).with_name("unix_probe.py").read_bytes()
     ).decode("ascii")
@@ -112,12 +116,17 @@ async def collect_unix(conn, platform, operation, sections=None, timeout=30):
             )
             if result.exit_status:
                 raise RuntimeError(
-                    "Fixed probe failed: Python 3 and an SSH exec shell are required. "
+                    "Fixed probe failed; check account permissions and platform prerequisites. "
                     + str(result.stderr)[:250]
                 )
             if len(result.stdout) > 2_000_000:
                 raise ValueError("evidence exceeds response limit")
-            value = json.loads(result.stdout)
+            if platform == "macos":
+                from remote_fleet_agent.tools.macos_native import parse
+
+                value = parse(name, result.stdout)
+            else:
+                value = json.loads(result.stdout)
             if (
                 not isinstance(value, dict)
                 or value.get("status") not in ("collected", "unknown")
@@ -140,8 +149,8 @@ async def collect_unix(conn, platform, operation, sections=None, timeout=30):
         else "partial"
     )
     report["coverage_notes"] = {
-        "platform": "Requires Python 3; reads available account-visible metadata only. No sudo, installation, discovery or repairs.",
-        "software": "Linux: dpkg/rpm package registrations; macOS: top-level system and shared Applications bundles. Per-user/portable applications may be absent.",
+        "platform": "macOS uses native tools without Python; Linux requires Python 3. Reads account-visible metadata only. No sudo, installation, discovery or repairs.",
+        "software": "Linux: dpkg/rpm package registrations; macOS: system_profiler application registrations. Per-user/portable applications may be absent.",
         "security": "Unavailable firewall, encryption, antivirus or privileged evidence is unknown, never a pass.",
         "container": "Containers share a Linux kernel and cannot validate physical disk encryption, systemd or macOS/Windows behavior.",
     }

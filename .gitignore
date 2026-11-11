@@ -63,3 +63,6 @@ id_rsa*
 /browser-results/
 /test-results/
 .DS_Store
+
+# Single-use pairing kits contain enrollment credentials.
+*-mac-connect.zip

@@ -57,6 +57,9 @@ class LiveService:
 
         self.investigations = InvestigationWorkflow(self)
         self.repairs = RepairWorkflow(self)
+        from remote_fleet_agent.mac_enrollment import MacEnrollment
+
+        self.mac_enrollment = MacEnrollment(self)
 
     def load_registry(self):
         value = read_json(self.directory / "workspace.json")
@@ -727,6 +730,7 @@ class LiveService:
         )
 
     async def tick(self, now=None):
+        await self.mac_enrollment.tick()
         await self.repairs.tick()
         now = now or datetime.now(UTC)
         for client in self.load_registry():
@@ -928,7 +932,7 @@ class LiveService:
         snap = self.snapshot(actor, client, site)
         commands = {
             "windows": f'powershell.exe -NoProfile -ExecutionPolicy Bypass -File ".\\Install-Assessment.ps1" -Engagement "{client}" -AllowedIP "ENGINEER_IPV4"',
-            "macos": "Use approved Remote Login access and Python 3. Verify the SSH host fingerprint at the Mac console before registration.",
+            "macos": "Owners can generate a single-use Mac connection kit in Settings. Native checks work over verified SSH without Python; optional private Python setup follows connection.",
             "linux": "Use an existing approved unprivileged SSH account with Python 3. Verify the host key through your trusted provisioning process.",
         }
         return {
@@ -947,7 +951,7 @@ class LiveService:
             ],
             "instructions": commands,
             "windows_kit_command": f"remote-fleet-agent init-client {shlex.quote(client)} --stage-dir ./assessment-kit --allowed-ip ENGINEER_IPV4",
-            "note": "Instructions only. No SSH service, user, dependency, key or installer is provisioned automatically. The Windows kit command runs separately on the engineer laptop and copies only its public key.",
+            "note": "Windows and Linux instructions run separately. Mac connection kits require explicit owner creation and target-side execution; no endpoint is changed merely by opening this page.",
         }
 
     def activity(self, actor, client, site=""):
@@ -1060,6 +1064,7 @@ class LiveService:
         return report.replace("<main>", "<main>" + summary, 1)
 
     async def close(self):
+        await self.mac_enrollment.close()
         await self.repairs.close()
         await self.support.close()
         for _, rt in self.runtimes.values():

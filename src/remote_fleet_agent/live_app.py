@@ -279,6 +279,8 @@ class Application:
         if split.path == "/api/logout" and method == "POST":
             del self.sessions[session]
             return {"signed_out": True, "_clear_cookie": True}
+        if split.path == "/api/enrollment-clients" and method == "POST":
+            return service.mac_enrollment.create_client(actor, data)
         if split.path == "/api/operators":
             service.store.require(actor, "*")
             if method == "GET":
@@ -333,6 +335,14 @@ class Application:
         service.grants(actor, client)
         if site:
             service.require_site(actor, client, site)
+        if action == "mac-enrollment":
+            if method == "GET" and len(parts) == 4:
+                return service.mac_enrollment.status(actor, client)
+            if method == "POST" and len(parts) == 4:
+                return await service.mac_enrollment.kit(actor, client, data)
+            if method == "POST" and len(parts) == 6 and parts[5] == "revoke":
+                return await service.mac_enrollment.revoke(actor, client, parts[4])
+            raise FileNotFoundError("Enrollment route not found.")
         if action in ("investigations", "repair-plans"):
             workflow = (
                 service.investigations
@@ -548,6 +558,7 @@ class Application:
                         "/",
                         "/app.js",
                         "/operations.js",
+                        "/enrollment.js",
                         "/app.css",
                         "/logo.svg",
                         "/favicon.svg",
@@ -556,6 +567,7 @@ class Application:
                             "/": "index.html",
                             "/app.js": "app.js",
                             "/operations.js": "operations.js",
+                            "/enrollment.js": "enrollment.js",
                             "/app.css": "app.css",
                             "/logo.svg": "logo.svg",
                             "/favicon.svg": "favicon.svg",
@@ -572,6 +584,7 @@ class Application:
                                 "/": "text/html",
                                 "/app.js": "text/javascript",
                                 "/operations.js": "text/javascript",
+                                "/enrollment.js": "text/javascript",
                                 "/app.css": "text/css",
                                 "/logo.svg": "image/svg+xml",
                                 "/favicon.svg": "image/svg+xml",
